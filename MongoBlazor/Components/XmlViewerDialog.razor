@@ -1,0 +1,46 @@
+﻿@using MudBlazor
+@using MongoBlazor.Model
+
+<MudDialog MaxWidth="MaxWidth.Large" FullWidth="true">
+
+    <DialogContent>
+
+        <MudText Typo="Typo.h6" Class="mb-2">
+            Tracking Id: @_data?.TrackingId
+        </MudText>
+
+        <MudTabs Rounded Border>
+
+            <MudTabPanel Text="Request XML">
+                <MudPaper Class="pa-3 xml-box">
+                    <pre>@_data?.RequestXML</pre>
+                </MudPaper>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Response XML">
+                <MudPaper Class="pa-3 xml-box">
+                    <pre>@_data?.ResponseXML</pre>
+                </MudPaper>
+            </MudTabPanel>
+
+        </MudTabs>
+
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton Color="Color.Primary" OnClick="Close">
+            Close
+        </MudButton>
+    </DialogActions>
+
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    public MudDialogInstance MudDialog { get; set; }
+
+    [Parameter]
+    public TransactionData _data { get; set; }
+
+    void Close() => MudDialog.Close();
+}

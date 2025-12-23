@@ -1,0 +1,183 @@
+﻿@page "/transactions"
+
+@using MongoBlazor.Services
+@using MongoBlazor.Model
+@using MudBlazor
+
+@inject TransactionService Service
+@inject ISnackbar Snackbar
+@inject IDialogService DialogService
+
+<MudContainer MaxWidth="MaxWidth.False" Class="mt-4">
+
+    <!-- HEADER -->
+    <MudText Typo="Typo.h5" Class="fw-bold mb-3">
+        Transaction Monitor
+    </MudText>
+
+    <!-- FILTER CARD -->
+    <MudPaper Elevation="3" Class="pa-4 mb-4 rounded-lg">
+
+        <MudGrid Spacing="3">
+            <MudItem xs="12" sm="3">
+                <MudTextField T="string"
+                              Label="Tracking Id"
+                              Variant="Variant.Outlined"
+                              Value="@TrackingId"
+                              ValueChanged="v => TrackingId = v"
+                              Clearable />
+            </MudItem>
+
+            <MudItem xs="12" sm="3">
+                <MudDatePicker T="DateTime?"
+                               Label="From Date"
+                               Variant="Variant.Outlined"
+                               Date="@FromDate"
+                               DateChanged="d => FromDate = d"
+                               Clearable />
+            </MudItem>
+
+            <MudItem xs="12" sm="3">
+                <MudDatePicker T="DateTime?"
+                               Label="To Date"
+                               Variant="Variant.Outlined"
+                               Date="@ToDate"
+                               DateChanged="d => ToDate = d"
+                               Clearable />
+            </MudItem>
+
+            <MudItem xs="12" sm="3">
+                <MudSelect T="string"
+                           Label="Status"
+                           Variant="Variant.Outlined"
+                           Value="@Status"
+                           ValueChanged="v => Status = v"
+                           Clearable>
+                    @* <MudSelectItem T="string" Value="All">All</MudSelectItem>
+                    <MudSelectItem T="string" Value="Success">Success</MudSelectItem>
+                    <MudSelectItem T="string" Value="Failure">Failure</MudSelectItem> *@
+                </MudSelect>
+            </MudItem>
+        </MudGrid>
+
+        <MudStack Direction="Row"  Class="mt-4">
+
+            <MudStack Direction="Row" Spacing="2">
+                <MudButton StartIcon="@Icons.Material.Filled.Search"
+                           Color="Color.Primary"
+                           OnClick="Search">
+                    Search
+                </MudButton>
+
+                <MudButton StartIcon="@Icons.Material.Filled.Clear"
+                           Variant="Variant.Outlined"
+                           OnClick="Clear">
+                    Clear
+                </MudButton>
+            </MudStack>
+
+            <MudButton StartIcon="@Icons.Material.Filled.Download"
+                       Color="Color.Success"
+                       OnClick="ExportExcel">
+                Export Excel
+            </MudButton>
+
+        </MudStack>
+
+    </MudPaper>
+
+    <!-- SUMMARY -->
+    <MudText Typo="Typo.subtitle2" Class="mb-2">
+        Total Records: <b>@_data.Count</b>
+    </MudText>
+
+    <!-- TABLE -->
+    <MudPaper Elevation="2" Class="rounded-lg">
+
+        <MudTable Items="_data"
+                  Dense
+                  Hover
+                  FixedHeader
+                  Height="65vh">
+
+            <HeaderContent>
+                <MudTh>Tracking Id</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh>Request Time</MudTh>
+                <MudTh>Response Time</MudTh>
+                <MudTh>Time Taken</MudTh>
+                <MudTh align="center">XML</MudTh>
+            </HeaderContent>
+
+            <RowTemplate Context="row">
+                <MudTd>@row.TrackingId</MudTd>
+
+                <MudTd>
+                    <MudChip T="string"
+                             Size="Size.Small"
+                             Color="@(row.Status == "Success" ? Color.Success : Color.Error)">
+                        @row.Status
+                    </MudChip>
+                </MudTd>
+
+                <MudTd>@row.RequestDateTime.ToString("dd-MM-yyyy HH:mm:ss")</MudTd>
+                <MudTd>@row.ResponseDateTime.ToString("dd-MM-yyyy HH:mm:ss")</MudTd>
+                <MudTd>@row.TimeTaken</MudTd>
+
+                <MudTd align="center">
+                    <MudIconButton Icon="@Icons.Material.Filled.Visibility"
+                                   Color="Color.Primary"
+                                   OnClick="@(() => ViewXml(row))" />
+                </MudTd>
+            </RowTemplate>
+
+        </MudTable>
+
+    </MudPaper>
+
+</MudContainer>
+
+@code {
+
+    private List<TransactionData> _data = new();
+
+    private string TrackingId;
+    private DateTime? FromDate;
+    private DateTime? ToDate;
+    private string Status = "All";
+
+    protected override async Task OnInitializedAsync()
+    {
+        _data = await Service.SearchAsync(null, null, null, "All");
+    }
+
+    async Task Search()
+        => _data = await Service.SearchAsync(TrackingId, FromDate, ToDate, Status);
+
+    async Task Clear()
+    {
+        TrackingId = null;
+        FromDate = null;
+        ToDate = null;
+        Status = "All";
+        _data = await Service.SearchAsync(null, null, null, "All");
+    }
+
+    void ExportExcel()
+    {
+        ExcelExporter.Export(_data);
+        Snackbar.Add("Excel exported successfully", Severity.Success);
+    }
+
+    void ViewXml(TransactionData row)
+    {
+        var parameters = new DialogParameters
+        {
+            { "RequestXml", row.RequestXML },
+            { "ResponseXml", row.ResponseXML }
+        };
+
+        DialogService.Show<XmlViewerDialog>(
+            $"XML Viewer - {row.TrackingId}", parameters);
+    }
+}

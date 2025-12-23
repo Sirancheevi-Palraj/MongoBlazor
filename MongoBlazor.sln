@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.14.36221.1
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MongoBlazor", "MongoBlazor\MongoBlazor.csproj", "{BB2B1ABD-694F-41FF-BBBC-77988F17DFB5}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{BB2B1ABD-694F-41FF-BBBC-77988F17DFB5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BB2B1ABD-694F-41FF-BBBC-77988F17DFB5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BB2B1ABD-694F-41FF-BBBC-77988F17DFB5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BB2B1ABD-694F-41FF-BBBC-77988F17DFB5}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {F9B97935-41F2-4FB3-86BC-4AD155C3832B}
+	EndGlobalSection
+EndGlobal
