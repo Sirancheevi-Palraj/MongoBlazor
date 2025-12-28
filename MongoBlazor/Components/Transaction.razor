@@ -13,6 +13,8 @@
         <!-- TOOLBAR -->
         <MudStack Row Spacing="2" AlignItems="AlignItems.Center">
 
+            @* <MudText Typo="Typo.h5" Class="fw-bold">Transaction Monitor</MudText> *@
+
             <MudSpacer />
 
             <MudTextField @bind-Value="_search"
@@ -28,7 +30,17 @@
                 <MudSelectItem Value="@("FAILURE")">Failure</MudSelectItem>
             </MudSelect>
 
-            <MudDateRangePicker @bind-DateRange="_dateRange" Label="Date Range" />
+            <MudDatePicker @bind-Date="_startDate"
+                           Label="Start Date"
+                           DateFormat="dd-MMM-yyyy"
+                           Clearable="true"
+                           Class="w-200" />
+
+            <MudDatePicker @bind-Date="_endDate"
+                           Label="End Date"
+                           DateFormat="dd-MMM-yyyy"
+                           Clearable="true"
+                           Class="w-200" />
 
             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ApplyFilter">Apply</MudButton>
             <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="ClearFilter">Reset</MudButton>
@@ -113,7 +125,8 @@
     private List<TransactionData> _allRecords = new();
     private List<TransactionData> _filteredRecords = new();
     private int _totalCount;
-    private DateRange? _dateRange;
+    private DateTime? _startDate;
+    private DateTime? _endDate;
     private string _search = "";
     private string _filterStatus = "All";
     private bool _isLoading = true;
@@ -130,27 +143,28 @@
             _isLoading = true;
             StateHasChanged();
 
-            // Load all data from database
+            // Load data from database with filters applied on server
             (var data, var total) = await TransactionService.GetTransactionsAsync(
-                search: null,
-                start: null,
-                end: null,
-                status: "All",
+                search: string.IsNullOrWhiteSpace(_search) ? null : _search,
+                start: _startDate,
+                end: _endDate,
+                status: _filterStatus,
                 page: 1,
-                pageSize: 1000, // Load more records for client-side filtering
+                pageSize: 1000, // Load more records
                 sortField: "RequestDateTime",
                 sortDesc: true
             );
 
             _allRecords = data;
+            _filteredRecords = data;
             _totalCount = total;
-
-            // Apply initial filter
-            ApplyClientSideFilter();
         }
         catch (Exception ex)
         {
             Snackbar.Add($"Error loading data: {ex.Message}", Severity.Error);
+            _allRecords = new List<TransactionData>();
+            _filteredRecords = new List<TransactionData>();
+            _totalCount = 0;
         }
         finally
         {
@@ -161,41 +175,23 @@
 
     private async Task ApplyFilter()
     {
+        // Reload data from server with current filters
         await LoadData();
     }
 
     private void ApplyClientSideFilter()
     {
-        _filteredRecords = _allRecords.Where(x =>
-        {
-            // Search filter
-            if (!string.IsNullOrWhiteSpace(_search) &&
-                !x.TrackingId.Contains(_search, StringComparison.OrdinalIgnoreCase))
-                return false;
-
-            // Status filter
-            if (_filterStatus != "All" && x.Status != _filterStatus)
-                return false;
-
-            // Date range filter
-            if (_dateRange?.Start != null && x.RequestDateTime.Date < _dateRange.Start.Value.Date)
-                return false;
-
-            if (_dateRange?.End != null && x.RequestDateTime.Date > _dateRange.End.Value.Date)
-                return false;
-
-            return true;
-        }).ToList();
-
-        _totalCount = _filteredRecords.Count;
+        // Not needed anymore - filtering is done on server
     }
 
     private async Task ClearFilter()
     {
         _search = "";
         _filterStatus = "All";
-        _dateRange = null;
+        _startDate = null;
+        _endDate = null;
 
+        // Reload data without filters
         await LoadData();
     }
 
@@ -213,11 +209,21 @@
     {
         try
         {
+            _isLoading = true;
+            StateHasChanged();
+
+            // Use current filtered data for export
             var rows = await TransactionService.GetAllForExportAsync(
                 string.IsNullOrWhiteSpace(_search) ? null : _search,
-                _dateRange?.Start,
-                _dateRange?.End,
+                _startDate,
+                _endDate,
                 _filterStatus);
+
+            if (rows == null || rows.Count == 0)
+            {
+                Snackbar.Add("No data to export", Severity.Warning);
+                return;
+            }
 
             using var wb = new ClosedXML.Excel.XLWorkbook();
             var ws = wb.Worksheets.Add("Transactions");
@@ -242,13 +248,13 @@
             {
                 var r = rows[i];
                 ws.Cell(i + 2, 1).Value = i + 1;
-                ws.Cell(i + 2, 2).Value = r.TrackingId;
-                ws.Cell(i + 2, 3).Value = r.Status;
-                ws.Cell(i + 2, 4).Value = r.RequestDateTime;
-                ws.Cell(i + 2, 5).Value = r.ResponseDateTime;
-                ws.Cell(i + 2, 6).Value = r.TimeTaken.ToString();
-                ws.Cell(i + 2, 7).Value = r.Timestamp;
-                ws.Cell(i + 2, 8).Value = r.Message;
+                ws.Cell(i + 2, 2).Value = r.TrackingId ?? "";
+                ws.Cell(i + 2, 3).Value = r.Status ?? "";
+                ws.Cell(i + 2, 4).Value = r.RequestDateTime.ToString("dd-MMM-yyyy HH:mm:ss");
+                ws.Cell(i + 2, 5).Value = r.ResponseDateTime?.ToString("dd-MMM-yyyy HH:mm:ss") ?? "";
+                ws.Cell(i + 2, 6).Value = r.TimeTaken.ToString(@"hh\:mm\:ss");
+                ws.Cell(i + 2, 7).Value = r.Timestamp.ToString("dd-MMM-yyyy HH:mm:ss");
+                ws.Cell(i + 2, 8).Value = r.Message ?? "";
             }
 
             // Auto-fit columns
@@ -256,7 +262,8 @@
 
             using var ms = new MemoryStream();
             wb.SaveAs(ms);
-            var base64 = Convert.ToBase64String(ms.ToArray());
+            var bytes = ms.ToArray();
+            var base64 = Convert.ToBase64String(bytes);
 
             await JS.InvokeVoidAsync("downloadFileFromStream",
                 $"Transactions_{DateTime.Now:yyyyMMddHHmmss}.xlsx",
@@ -268,6 +275,12 @@
         catch (Exception ex)
         {
             Snackbar.Add($"Export failed: {ex.Message}", Severity.Error);
+            Console.WriteLine($"Export error: {ex}");
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
         }
     }
 }
