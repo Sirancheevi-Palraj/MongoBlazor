@@ -13,6 +13,7 @@ builder.Services.Configure<MongoDbSettings>(
 
 builder.Services.AddSingleton<TransactionService>();
 
+
 // ✅ THIS NOW WORKS
 builder.Services.AddMudServices();
 

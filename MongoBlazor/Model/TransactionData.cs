@@ -10,21 +10,15 @@ namespace MongoBlazor.Model
         public ObjectId? Id { get; set; }
 
         public string TrackingId { get; set; }
-
         public string Status { get; set; }
-
         public string RequestXML { get; set; }
-
         public string ResponseXML { get; set; }
 
         public DateTime RequestDateTime { get; set; }
-
-        public DateTime ResponseDateTime { get; set; }
+        public DateTime? ResponseDateTime { get; set; }   // <-- Nullable
 
         public TimeSpan TimeTaken { get; set; }
-
         public DateTime Timestamp { get; set; }
-
         public string Message { get; set; }
     }
 }

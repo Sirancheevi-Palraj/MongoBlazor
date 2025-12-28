@@ -1,183 +1,244 @@
 ﻿@page "/transactions"
-
-@using MongoBlazor.Services
 @using MongoBlazor.Model
+@using MongoBlazor.Services
 @using MudBlazor
-
-@inject TransactionService Service
+@inject TransactionService TransactionService
 @inject ISnackbar Snackbar
+@inject IJSRuntime JS
 @inject IDialogService DialogService
 
-<MudContainer MaxWidth="MaxWidth.False" Class="mt-4">
+<MudPaper Class="pa-4" Style="max-width:1400px;margin:auto;">
+    <MudCard Class="pa-3 mb-3">
 
-    <!-- HEADER -->
-    <MudText Typo="Typo.h5" Class="fw-bold mb-3">
-        Transaction Monitor
-    </MudText>
+        <!-- TOOLBAR -->
+        <MudStack Row Spacing="2" >
 
-    <!-- FILTER CARD -->
-    <MudPaper Elevation="3" Class="pa-4 mb-4 rounded-lg">
+            <MudText Typo="Typo.h5" Class="fw-bold">Transaction Monitor</MudText>
 
-        <MudGrid Spacing="3">
-            <MudItem xs="12" sm="3">
-                <MudTextField T="string"
-                              Label="Tracking Id"
-                              Variant="Variant.Outlined"
-                              Value="@TrackingId"
-                              ValueChanged="v => TrackingId = v"
-                              Clearable />
-            </MudItem>
+            <MudSpacer />
 
-            <MudItem xs="12" sm="3">
-                <MudDatePicker T="DateTime?"
-                               Label="From Date"
-                               Variant="Variant.Outlined"
-                               Date="@FromDate"
-                               DateChanged="d => FromDate = d"
-                               Clearable />
-            </MudItem>
+            <MudTextField @bind-Value="_search"
+                          Placeholder="Search Tracking Id / Message"
+                          Adornment="Adornment.Start"
+                          AdornmentIcon="@Icons.Material.Filled.Search"
+                          Immediate="true"
+                          Class="w-300"
+                          OnInput="@( (string _) => ApplyFilter() )" />
 
-            <MudItem xs="12" sm="3">
-                <MudDatePicker T="DateTime?"
-                               Label="To Date"
-                               Variant="Variant.Outlined"
-                               Date="@ToDate"
-                               DateChanged="d => ToDate = d"
-                               Clearable />
-            </MudItem>
+            <MudSelect T="string" Label="Status" @bind-Value="_filter.Status" Class="w-200">
+               @*  <MudSelectItem Value="All">All</MudSelectItem>
+                <MudSelectItem Value="Success">Success</MudSelectItem>
+                <MudSelectItem Value="Failure">Failure</MudSelectItem> *@
+            </MudSelect>
 
-            <MudItem xs="12" sm="3">
-                <MudSelect T="string"
-                           Label="Status"
-                           Variant="Variant.Outlined"
-                           Value="@Status"
-                           ValueChanged="v => Status = v"
-                           Clearable>
-                    @* <MudSelectItem T="string" Value="All">All</MudSelectItem>
-                    <MudSelectItem T="string" Value="Success">Success</MudSelectItem>
-                    <MudSelectItem T="string" Value="Failure">Failure</MudSelectItem> *@
-                </MudSelect>
-            </MudItem>
-        </MudGrid>
+            <MudDateRangePicker @bind-DateRange="_dateRange" Label="Date Range" />
 
-        <MudStack Direction="Row"  Class="mt-4">
-
-            <MudStack Direction="Row" Spacing="2">
-                <MudButton StartIcon="@Icons.Material.Filled.Search"
-                           Color="Color.Primary"
-                           OnClick="Search">
-                    Search
-                </MudButton>
-
-                <MudButton StartIcon="@Icons.Material.Filled.Clear"
-                           Variant="Variant.Outlined"
-                           OnClick="Clear">
-                    Clear
-                </MudButton>
-            </MudStack>
-
-            <MudButton StartIcon="@Icons.Material.Filled.Download"
-                       Color="Color.Success"
-                       OnClick="ExportExcel">
-                Export Excel
-            </MudButton>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ApplyFilter">Apply</MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="ClearFilter">Reset</MudButton>
+            <MudButton Variant="Variant.Outlined" Color="Color.Success" OnClick="DownloadExcel">Export</MudButton>
 
         </MudStack>
+    </MudCard>
 
-    </MudPaper>
-
-    <!-- SUMMARY -->
-    <MudText Typo="Typo.subtitle2" Class="mb-2">
-        Total Records: <b>@_data.Count</b>
+    <MudText Typo="Typo.subtitle2" Class="mb-1">
+        Total Records: @_totalCount
     </MudText>
 
-    <!-- TABLE -->
-    <MudPaper Elevation="2" Class="rounded-lg">
+    <!-- DATA GRID -->
+    <MudTable T="TransactionData"
+              @ref="_table"
+              @* ServerData="LoadServerData" *@
+              Items="_records"
+              Dense="true"
+              Hover="true"
+              Bordered="true"
+              Striped="true"
+              FixedHeader="true"
+              RowsPerPage="20"
+              Breakpoint="Breakpoint.Sm">
 
-        <MudTable Items="_data"
-                  Dense
-                  Hover
-                  FixedHeader
-                  Height="65vh">
 
-            <HeaderContent>
-                <MudTh>Tracking Id</MudTh>
-                <MudTh>Status</MudTh>
-                <MudTh>Request Time</MudTh>
-                <MudTh>Response Time</MudTh>
-                <MudTh>Time Taken</MudTh>
-                <MudTh align="center">XML</MudTh>
-            </HeaderContent>
+        <HeaderContent>
+            <MudTh>#</MudTh>
+            <MudTh SortLabel="TrackingId">Tracking Id</MudTh>
+            <MudTh SortLabel="Status">Status</MudTh>
+            <MudTh>Request XML</MudTh>
+            <MudTh>Response XML</MudTh>
+            <MudTh SortLabel="RequestDateTime">Request Time</MudTh>
+            <MudTh SortLabel="ResponseDateTime">Response Time</MudTh>
+            <MudTh>Time Taken</MudTh>
+            <MudTh SortLabel="Timestamp">Created</MudTh>
+        </HeaderContent>
 
-            <RowTemplate Context="row">
-                <MudTd>@row.TrackingId</MudTd>
+        <RowTemplate Context="x">
+            <MudTd>@(++_rowIndex)</MudTd>
+            <MudTd>@x.TrackingId</MudTd>
 
-                <MudTd>
-                    <MudChip T="string"
-                             Size="Size.Small"
-                             Color="@(row.Status == "Success" ? Color.Success : Color.Error)">
-                        @row.Status
-                    </MudChip>
-                </MudTd>
+            <MudTd>
+                <MudChip T="string"
+                         Color="@(x.Status=="SUCCESS" ? Color.Success : Color.Error)"
+                         Variant="Variant.Filled"
+                         Size="Size.Small">
+                    @x.Status
+                </MudChip>
+            </MudTd>
 
-                <MudTd>@row.RequestDateTime.ToString("dd-MM-yyyy HH:mm:ss")</MudTd>
-                <MudTd>@row.ResponseDateTime.ToString("dd-MM-yyyy HH:mm:ss")</MudTd>
-                <MudTd>@row.TimeTaken</MudTd>
+            <MudTd>
+                <MudButton Variant="Variant.Text" Size="Size.Small"
+                         >
+                    View
+                </MudButton>
+            </MudTd>
 
-                <MudTd align="center">
-                    <MudIconButton Icon="@Icons.Material.Filled.Visibility"
-                                   Color="Color.Primary"
-                                   OnClick="@(() => ViewXml(row))" />
-                </MudTd>
-            </RowTemplate>
+            <MudTd>
+                <MudButton Variant="Variant.Text" Size="Size.Small" >
+                           @* OnClick="@(()=>OpenDialog(x,"Response XML"))"> *@
+                    View
+                </MudButton>
+            </MudTd>
 
-        </MudTable>
+            <MudTd>@x.RequestDateTime:dd-MMM-yyyy HH:mm:ss</MudTd>
+            <MudTd>@x.ResponseDateTime?.ToString("dd-MMM-yyyy HH:mm:ss")</MudTd>
+            <MudTd>@x.TimeTaken</MudTd>
+            <MudTd>@x.Timestamp:dd-MMM-yyyy HH:mm:ss</MudTd>
+        </RowTemplate>
 
-    </MudPaper>
+        <PagerContent>
+            <MudTablePager />
+        </PagerContent>
 
-</MudContainer>
+    </MudTable>
+</MudPaper>
 
 @code {
+    private List<TransactionData> _records = new();
+    private int _totalCount;
 
-    private List<TransactionData> _data = new();
+    private DateRange? _dateRange;
+    private string _search = "";
+    private int _rowIndex = 0;
 
-    private string TrackingId;
-    private DateTime? FromDate;
-    private DateTime? ToDate;
-    private string Status = "All";
-
+    private class FilterModel
+    {
+        public string TrackingId { get; set; }
+        public DateTime? StartDate { get; set; }
+        public DateTime? EndDate { get; set; }
+        public string Status { get; set; } = "All";
+    }
     protected override async Task OnInitializedAsync()
     {
-        _data = await Service.SearchAsync(null, null, null, "All");
+        (var data, var total) = await TransactionService.GetTransactionsAsync(
+            null, null, null, "All", 1, 200);
+
+        _records = data;
+        _totalCount = total;
     }
 
-    async Task Search()
-        => _data = await Service.SearchAsync(TrackingId, FromDate, ToDate, Status);
+    private FilterModel _filter = new();
 
-    async Task Clear()
+   
+    private Task ClearFilter()
     {
-        TrackingId = null;
-        FromDate = null;
-        ToDate = null;
-        Status = "All";
-        _data = await Service.SearchAsync(null, null, null, "All");
+        _filter = new();
+        _search = "";
+        _dateRange = null;
+        return ApplyFilter();
     }
 
-    void ExportExcel()
+    private async Task<TableData<TransactionData>> LoadServerData(
+        TableState state,
+        CancellationToken token)
     {
-        ExcelExporter.Export(_data);
-        Snackbar.Add("Excel exported successfully", Severity.Success);
-    }
+        _rowIndex = state.Page * state.PageSize;
 
-    void ViewXml(TransactionData row)
-    {
-        var parameters = new DialogParameters
+        var sortField = state.SortLabel ?? "RequestDateTime";
+        var sortDesc = state.SortDirection == SortDirection.Descending;
+
+        (List<TransactionData> records, int total) =
+            await TransactionService.GetTransactionsAsync(
+                _search,
+                _dateRange?.Start,
+                _dateRange?.End,
+                _filter.Status,
+                state.Page + 1,
+                state.PageSize,
+                sortField,
+                sortDesc
+            );
+
+        _records = records;
+        _totalCount = total;
+
+        return new TableData<TransactionData>
         {
-            { "RequestXml", row.RequestXML },
-            { "ResponseXml", row.ResponseXML }
+            Items = _records,
+            TotalItems = _totalCount
         };
-
-        DialogService.Show<XmlViewerDialog>(
-            $"XML Viewer - {row.TrackingId}", parameters);
     }
+    private async Task ApplyFilter()
+    {
+        if (_table != null)
+            await _table.ReloadServerData();
+    }
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && _table != null)
+            await _table.ReloadServerData();
+    }
+    private void OpenDialog(TransactionData item, string title)
+    {
+        var p = new DialogParameters { ["_data"] = item };
+        DialogService.Show<XmlViewerDialog>(title, p);
+    }
+
+    private async Task DownloadExcel()
+    {
+        try
+        {
+            var rows = await TransactionService.GetAllForExportAsync(
+                _search, _dateRange?.Start, _dateRange?.End, _filter.Status);
+
+            using var wb = new ClosedXML.Excel.XLWorkbook();
+            var ws = wb.Worksheets.Add("Transactions");
+
+            ws.Cell(1, 1).Value = "No";
+            ws.Cell(1, 2).Value = "TrackingId";
+            ws.Cell(1, 3).Value = "Status";
+            ws.Cell(1, 4).Value = "RequestDateTime";
+            ws.Cell(1, 5).Value = "ResponseDateTime";
+            ws.Cell(1, 6).Value = "TimeTaken";
+            ws.Cell(1, 7).Value = "CreatedDate";
+            ws.Cell(1, 8).Value = "Message";
+
+            for (int i = 0; i < rows.Count; i++)
+            {
+                var r = rows[i];
+                ws.Cell(i + 2, 1).Value = i + 1;
+                ws.Cell(i + 2, 2).Value = r.TrackingId;
+                ws.Cell(i + 2, 3).Value = r.Status;
+                ws.Cell(i + 2, 4).Value = r.RequestDateTime;
+                ws.Cell(i + 2, 5).Value = r.ResponseDateTime;
+                ws.Cell(i + 2, 6).Value = r.TimeTaken;
+                ws.Cell(i + 2, 7).Value = r.Timestamp;
+                ws.Cell(i + 2, 8).Value = r.Message;
+            }
+
+            using var ms = new MemoryStream();
+            wb.SaveAs(ms);
+            var base64 = Convert.ToBase64String(ms.ToArray());
+
+            await JS.InvokeVoidAsync("downloadFileFromStream",
+                $"Transactions_{DateTime.Now:yyyyMMddHHmmss}.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                base64);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Export failed: {ex.Message}", Severity.Error);
+        }
+    }
+
+    private MudTable<TransactionData>? _table;
 }
