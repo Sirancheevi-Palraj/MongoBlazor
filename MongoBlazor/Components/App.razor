@@ -1,41 +1,26 @@
-﻿@using System.Net.Http
-@using System.Net.Http.Json
-@using Microsoft.AspNetCore.Components.Forms
-@using Microsoft.AspNetCore.Components.Routing
-@using Microsoft.AspNetCore.Components.Web
-@using static Microsoft.AspNetCore.Components.Web.RenderMode
-@using Microsoft.AspNetCore.Components.Web.Virtualization
-@using Microsoft.JSInterop
-@using MongoBlazor
-@using MongoBlazor.Components
-@using MudBlazor
-
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
+    <link rel="stylesheet" href="app.css" />
+    <link rel="icon" type="image/png" href="favicon.png" />
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="bootstrap/bootstrap.min.css" />
     <link rel="stylesheet" href="app.css" />
     <link rel="stylesheet" href="MongoBlazor.styles.css" />
-    <link rel="icon" type="image/png" href="favicon.png" />
-
-    <!-- MudBlazor CSS -->
-    <link href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" rel="stylesheet" />
     <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
-
-    <HeadOutlet />
+    <link rel="stylesheet" href="BpaWebApp.styles.css" />
+    <HeadOutlet @rendermode="InteractiveServer" />
 </head>
+
 <body>
-    <MudThemeProvider />
-    <MudPopoverProvider />
-    <MudDialogProvider />
-    <MudSnackbarProvider />
-
-    <Routes />
-
+    <Routes @rendermode="InteractiveServer" />
     <script src="_framework/blazor.web.js"></script>
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
     <script>
         window.downloadFileFromStream = (fileName, contentType, base64Data) => {
             const link = document.createElement("a");
@@ -47,4 +32,5 @@
         };
     </script>
 </body>
+
 </html>

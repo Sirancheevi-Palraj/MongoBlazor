@@ -1,5 +1,14 @@
 ﻿@inherits LayoutComponentBase
+@using MudBlazor
+@using MudBlazor.Utilities
+@inject Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage.ProtectedSessionStorage sessionStorage
+@inject NavigationManager NavigationManager
 
+<MudThemeProvider IsDarkMode="false" />
+<MudPopoverProvider />
+
+<MudDialogProvider />
+<MudSnackbarProvider />
 
 <div class="page">
     <div class="sidebar">
