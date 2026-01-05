@@ -7,6 +7,7 @@
 @inject ISnackbar Snackbar
 @inject IJSRuntime JS
 @inject IDialogService DialogService
+@inject IDialogService DialogService
 
 <MudPaper Class="pa-4" Style="max-width:1400px;margin:auto;">
     <MudCard Class="pa-3 mb-3">
@@ -203,7 +204,15 @@
             ["Transaction"] = item,
             ["XmlType"] = title
         };
-        DialogService.Show<XmlViewerDialog>(title, parameters);
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.ExtraLarge,
+            FullWidth = true,
+            CloseButton = true
+        };
+
+        DialogService.Show<XmlViewerDialog>("Transaction XML Details", parameters, options);
     }
 
     private async Task DownloadExcel()

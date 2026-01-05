@@ -9,7 +9,7 @@
   <ItemGroup>
 	  <PackageReference Include="ClosedXML" Version="0.105.0" />
 	  <PackageReference Include="MongoDB.Driver" Version="2.25.0" />
-	  <PackageReference Include="MudBlazor" Version="8.15.0" />
+	  <PackageReference Include="MudBlazor" Version="7.16.0" />
   </ItemGroup>
 
 </Project>

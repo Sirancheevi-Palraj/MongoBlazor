@@ -1,33 +1,947 @@
-﻿@* @using MongoBlazor.Model
+﻿@using MongoBlazor.Model
+@using MudBlazor
+@using System.Xml.Linq
+@using System.Xml
+@inject IJSRuntime JS
 
-<DialogContent>
-    <MudText Typo="Typo.h6" Class="mb-2">
-        Tracking Id: @_data?.TrackingId
-    </MudText>
+<MudDialog MaxWidth="MaxWidth.ExtraLarge">
+    <DialogContent>
+        <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+            <MudText Typo="Typo.h6">
+                Tracking Id: <strong>@Transaction?.TrackingId</strong>
+            </MudText>
+            <MudStack Row Spacing="1">
+                <MudTooltip Text="Open in New Tab">
+                    <MudIconButton Icon="@Icons.Material.Filled.OpenInNew"
+                                   Color="Color.Primary"
+                                   Size="Size.Small"
+                                   OnClick="OpenInNewTab" />
+                </MudTooltip>
+                <MudTooltip Text="Copy XML">
+                    <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
+                                   Color="Color.Primary"
+                                   Size="Size.Small"
+                                   OnClick="CopyToClipboard" />
+                </MudTooltip>
+                <MudTooltip Text="Download XML">
+                    <MudIconButton Icon="@Icons.Material.Filled.Download"
+                                   Color="Color.Primary"
+                                   Size="Size.Small"
+                                   OnClick="DownloadXml" />
+                </MudTooltip>
+            </MudStack>
+        </MudStack>
 
-    <MudTabs Rounded Border>
-        <MudTabPanel Text="Request XML">
-            <MudPaper Class="pa-3 xml-box">
-                <pre>@_data?.RequestXML</pre>
-            </MudPaper>
-        </MudTabPanel>
+        <MudPaper Class="xml-viewer-container" Elevation="2">
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Class="ma-2">@errorMessage</MudAlert>
+            }
+            else
+            {
+                <div class="xml-viewer">
+                    <div class="line-numbers">
+                        @for (int i = 1; i <= lineCount; i++)
+                        {
+                            <div class="line-number">@i</div>
+                        }
+                    </div>
+                    <div class="xml-code">
+                        <pre>@((MarkupString)formattedXml)</pre>
+                    </div>
+                </div>
+            }
+        </MudPaper>
+    </DialogContent>
 
-        <MudTabPanel Text="Response XML">
-            <MudPaper Class="pa-3 xml-box">
-                <pre>@_data?.ResponseXML</pre>
-            </MudPaper>
-        </MudTabPanel>
-    </MudTabs>
-</DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   OnClick="Close">
+            Close
+        </MudButton>
+    </DialogActions>
+</MudDialog>
 
-<DialogActions>
-    <MudButton Color="Color.Primary" OnClick="Close">Close</MudButton>
-</DialogActions>
+<style>
+    .xml-viewer-container {
+        background-color: #1e1e1e;
+        border: 1px solid #3e3e42;
+        border-radius: 8px;
+        max-height: 70vh;
+        overflow: hidden;
+    }
+
+    .xml-viewer {
+        display: flex;
+        max-height: 70vh;
+        overflow: auto;
+        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        font-size: 14px;
+        line-height: 1.6;
+    }
+
+    .line-numbers {
+        background-color: #252526;
+        color: #858585;
+        padding: 16px 8px;
+        text-align: right;
+        user-select: none;
+        min-width: 50px;
+        border-right: 1px solid #3e3e42;
+        flex-shrink: 0;
+    }
+
+    .line-number {
+        height: 22.4px;
+        font-size: 13px;
+    }
+
+    .xml-code {
+        flex: 1;
+        padding: 16px;
+        overflow-x: auto;
+        color: #d4d4d4;
+    }
+
+        .xml-code pre {
+            margin: 0;
+            white-space: pre;
+            font-family: inherit;
+            font-size: inherit;
+            line-height: inherit;
+        }
+
+    /* XML Syntax Highlighting - VS Code Style */
+    .xml-declaration {
+        color: #c586c0;
+    }
+
+    .xml-tag-bracket {
+        color: #808080;
+    }
+
+    .xml-tag-name {
+        color: #4ec9b0;
+    }
+
+    .xml-tag-slash {
+        color: #808080;
+    }
+
+    .xml-attribute-name {
+        color: #9cdcfe;
+    }
+
+    .xml-attribute-equals {
+        color: #d4d4d4;
+    }
+
+    .xml-attribute-value {
+        color: #ce9178;
+    }
+
+    .xml-text-content {
+        color: #d4d4d4;
+    }
+
+    .xml-comment {
+        color: #6a9955;
+        font-style: italic;
+    }
+
+    /* Scrollbar styling for dark theme */
+    .xml-viewer::-webkit-scrollbar {
+        width: 12px;
+        height: 12px;
+    }
+
+    .xml-viewer::-webkit-scrollbar-track {
+        background: #1e1e1e;
+    }
+
+    .xml-viewer::-webkit-scrollbar-thumb {
+        background: #424242;
+        border-radius: 6px;
+    }
+
+        .xml-viewer::-webkit-scrollbar-thumb:hover {
+            background: #4e4e4e;
+        }
+</style>
 
 @code {
-  
-    // [CascadingParameter] public MudDialogInstance MudDialog { get; set; }
-    // [Parameter] public TransactionData _data { get; set; }
-    // void Close() => MudDialog.Close();
+    [CascadingParameter]
+    private MudBlazor.MudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public TransactionData? Transaction { get; set; }
+
+    [Parameter]
+    public string? XmlType { get; set; }
+
+    private string formattedXml = string.Empty;
+    private string? errorMessage;
+    private int lineCount = 0;
+    private string rawXml = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        FormatAndHighlightXml();
+    }
+
+    private void FormatAndHighlightXml()
+    {
+        rawXml = GetXmlContent();
+
+        if (string.IsNullOrWhiteSpace(rawXml) ||
+            rawXml.Contains("No data available") ||
+            (rawXml.Contains("No ") && rawXml.Contains(" XML available")))
+        {
+            errorMessage = rawXml;
+            return;
+        }
+
+        try
+        {
+            // Clean the XML string
+            var cleanedXml = CleanXmlString(rawXml);
+
+            // Parse and beautify XML
+            var doc = XDocument.Parse(cleanedXml);
+
+            var settings = new XmlWriterSettings
+            {
+                Indent = true,
+                IndentChars = "  ",
+                NewLineChars = "\n",
+                OmitXmlDeclaration = doc.Declaration == null
+            };
+
+            using var stringWriter = new System.IO.StringWriter();
+            using var xmlWriter = XmlWriter.Create(stringWriter, settings);
+            doc.Save(xmlWriter);
+            xmlWriter.Flush();
+
+            var beautified = stringWriter.ToString();
+
+            // Add XML declaration if present
+            if (doc.Declaration != null)
+            {
+                beautified = $"<?xml version=\"{doc.Declaration.Version}\" encoding=\"{doc.Declaration.Encoding}\"?>\n{beautified}";
+            }
+
+            formattedXml = ApplySyntaxHighlighting(beautified);
+            lineCount = beautified.Split('\n').Length;
+
+            // Update rawXml with cleaned version for copy/download
+            rawXml = beautified;
+        }
+        catch (Exception ex)
+        {
+            // If parsing fails, try to display as plain text with highlighting
+            try
+            {
+                var cleanedXml = CleanXmlString(rawXml);
+                formattedXml = ApplySyntaxHighlighting(System.Net.WebUtility.HtmlEncode(cleanedXml));
+                lineCount = cleanedXml.Split('\n').Length;
+                errorMessage = $"Warning: XML may have formatting issues. Displaying as plain text. Error: {ex.Message}";
+            }
+            catch
+            {
+                errorMessage = $"Failed to parse XML: {ex.Message}";
+            }
+        }
+    }
+
+    private string CleanXmlString(string xml)
+    {
+        if (string.IsNullOrWhiteSpace(xml))
+            return xml;
+
+        // Remove BOM if present
+        xml = xml.Trim('\uFEFF', '\u200B');
+
+        // Fix common escape sequence issues
+        xml = xml.Replace("\\'", "'");
+        xml = xml.Replace("\\\"", "\"");
+        xml = xml.Replace("\\\\", "\\");
+
+        // Remove any leading/trailing whitespace
+        xml = xml.Trim();
+
+        // If the XML is wrapped in quotes, unwrap it
+        if (xml.StartsWith("\"") && xml.EndsWith("\""))
+        {
+            xml = xml.Substring(1, xml.Length - 2);
+        }
+        if (xml.StartsWith("'") && xml.EndsWith("'"))
+        {
+            xml = xml.Substring(1, xml.Length - 2);
+        }
+
+        return xml;
+    }
+
+    private string GetXmlContent()
+    {
+        if (Transaction == null) return "No data available";
+
+        return XmlType switch
+        {
+            "Request XML" => Transaction.RequestXML ?? "No request XML available",
+            "Response XML" => Transaction.ResponseXML ?? "No response XML available",
+            _ => "Unknown XML type"
+        };
+    }
+
+    private string ApplySyntaxHighlighting(string xml)
+    {
+        // Escape HTML
+        xml = System.Net.WebUtility.HtmlEncode(xml);
+
+        // Highlight XML declaration
+        xml = System.Text.RegularExpressions.Regex.Replace(xml,
+            @"(&lt;\?xml[^?]*\?&gt;)",
+            match => $"<span class='xml-declaration'>{match.Groups[1].Value}</span>");
+
+        // Highlight comments
+        xml = System.Text.RegularExpressions.Regex.Replace(xml,
+            @"(&lt;!--.*?--&gt;)",
+            match => $"<span class='xml-comment'>{match.Groups[1].Value}</span>",
+            System.Text.RegularExpressions.RegexOptions.Singleline);
+
+        // Highlight opening tags with attributes
+        xml = System.Text.RegularExpressions.Regex.Replace(xml,
+            @"(&lt;)(\w+)((?:\s+\w+(?:=&quot;[^&quot;]*&quot;)?)*\s*)(/?)(&gt;)",
+            match =>
+            {
+                var openBracket = $"<span class='xml-tag-bracket'>{match.Groups[1].Value}</span>";
+                var tagName = $"<span class='xml-tag-name'>{match.Groups[2].Value}</span>";
+                var attributes = HighlightAttributes(match.Groups[3].Value);
+                var slash = match.Groups[4].Success ? $"<span class='xml-tag-slash'>{match.Groups[4].Value}</span>" : "";
+                var closeBracket = $"<span class='xml-tag-bracket'>{match.Groups[5].Value}</span>";
+                return openBracket + tagName + attributes + slash + closeBracket;
+            });
+
+        // Highlight closing tags
+        xml = System.Text.RegularExpressions.Regex.Replace(xml,
+            @"(&lt;/)(\w+)(&gt;)",
+            match =>
+            {
+                var openBracket = $"<span class='xml-tag-bracket'>{match.Groups[1].Value}</span>";
+                var tagName = $"<span class='xml-tag-name'>{match.Groups[2].Value}</span>";
+                var closeBracket = $"<span class='xml-tag-bracket'>{match.Groups[3].Value}</span>";
+                return openBracket + tagName + closeBracket;
+            });
+
+        return xml;
+    }
+
+    private string HighlightAttributes(string attributes)
+    {
+        if (string.IsNullOrWhiteSpace(attributes))
+            return attributes;
+
+        // Highlight attribute name and value
+        attributes = System.Text.RegularExpressions.Regex.Replace(attributes,
+            @"(\w+)(=)(&quot;[^&quot;]*&quot;)",
+            match =>
+            {
+                var attrName = $"<span class='xml-attribute-name'>{match.Groups[1].Value}</span>";
+                var equals = $"<span class='xml-attribute-equals'>{match.Groups[2].Value}</span>";
+                var attrValue = $"<span class='xml-attribute-value'>{match.Groups[3].Value}</span>";
+                return attrName + equals + attrValue;
+            });
+
+        return attributes;
+    }
+
+    private async Task OpenInNewTab()
+    {
+        try
+        {
+            // Create a data URL with the XML content
+            var xmlContent = rawXml;
+            var base64 = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(xmlContent));
+
+            // Open in new tab with proper XML content type
+            await JS.InvokeVoidAsync("eval", $@"
+                const xmlContent = atob('{base64}');
+                const blob = new Blob([xmlContent], {{ type: 'application/xml' }});
+                const url = URL.createObjectURL(blob);
+                const newWindow = window.open(url, '_blank');
+                if (newWindow) {{
+                    newWindow.focus();
+                    setTimeout(() => URL.revokeObjectURL(url), 100);
+                }}
+            ");
+        }
+        catch
+        {
+            // Silently fail
+        }
+    }
+
+    private async Task CopyToClipboard()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", rawXml);
+        }
+        catch
+        {
+            // Silently fail if clipboard API is not available
+        }
+    }
+
+    private async Task DownloadXml()
+    {
+        try
+        {
+            var fileName = $"{Transaction?.TrackingId}_{XmlType?.Replace(" ", "_")}.xml";
+            var bytes = System.Text.Encoding.UTF8.GetBytes(rawXml);
+            var base64 = Convert.ToBase64String(bytes);
+
+            await JS.InvokeVoidAsync("downloadFileFromStream", fileName, "application/xml", base64);
+        }
+        catch
+        {
+            // Silently fail
+        }
+    }
+
+    private void Close() => MudDialog?.Close();
 }
- *@
+
+
+@* @using MongoBlazor.Model
+@using MudBlazor
+@using System.Xml.Linq
+@using System.Xml
+@inject IJSRuntime JS
+
+<MudDialog MaxWidth="MaxWidth.ExtraLarge">
+    <DialogContent>
+        <MudStack Row Justify="Justify.SpaceBetween" AlignItems="AlignItems.Center" Class="mb-3">
+            <MudText Typo="Typo.h6">
+                Tracking Id: <strong>@Transaction?.TrackingId</strong>
+            </MudText>
+            <MudStack Row Spacing="1">
+                <MudTooltip Text="Copy XML">
+                    <MudIconButton Icon="@Icons.Material.Filled.ContentCopy"
+                                   Color="Color.Primary"
+                                   Size="Size.Small"
+                                   OnClick="CopyToClipboard" />
+                </MudTooltip>
+                <MudTooltip Text="Download XML">
+                    <MudIconButton Icon="@Icons.Material.Filled.Download"
+                                   Color="Color.Primary"
+                                   Size="Size.Small"
+                                   OnClick="DownloadXml" />
+                </MudTooltip>
+            </MudStack>
+        </MudStack>
+
+        <MudPaper Class="xml-viewer-container" Elevation="2">
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <MudAlert Severity="Severity.Error" Class="ma-2">@errorMessage</MudAlert>
+            }
+            else
+            {
+                <div class="xml-viewer">
+                    <div class="line-numbers">
+                        @for (int i = 1; i <= lineCount; i++)
+                        {
+                            <div class="line-number">@i</div>
+                        }
+                    </div>
+                    <div class="xml-code">
+                        <pre>@((MarkupString)formattedXml)</pre>
+                    </div>
+                </div>
+            }
+        </MudPaper>
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton Color="Color.Primary"
+                   Variant="Variant.Filled"
+                   OnClick="Close">
+            Close
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+<style>
+    .xml-viewer-container {
+        background-color: #1e1e1e;
+        border: 1px solid #3e3e42;
+        border-radius: 8px;
+        max-height: 70vh;
+        overflow: hidden;
+    }
+
+    .xml-viewer {
+        display: flex;
+        max-height: 70vh;
+        overflow: auto;
+        font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        font-size: 14px;
+        line-height: 1.6;
+    }
+
+    .line-numbers {
+        background-color: #252526;
+        color: #858585;
+        padding: 16px 8px;
+        text-align: right;
+        user-select: none;
+        min-width: 50px;
+        border-right: 1px solid #3e3e42;
+        flex-shrink: 0;
+    }
+
+    .line-number {
+        height: 22.4px;
+        font-size: 13px;
+    }
+
+    .xml-code {
+        flex: 1;
+        padding: 16px;
+        overflow-x: auto;
+        color: #d4d4d4;
+    }
+
+        .xml-code pre {
+            margin: 0;
+            white-space: pre;
+            font-family: inherit;
+            font-size: inherit;
+            line-height: inherit;
+        }
+
+    /* XML Syntax Highlighting - VS Code Style */
+    .xml-declaration {
+        color: #c586c0;
+    }
+
+    .xml-tag-bracket {
+        color: #808080;
+    }
+
+    .xml-tag-name {
+        color: #4ec9b0;
+    }
+
+    .xml-tag-slash {
+        color: #808080;
+    }
+
+    .xml-attribute-name {
+        color: #9cdcfe;
+    }
+
+    .xml-attribute-equals {
+        color: #d4d4d4;
+    }
+
+    .xml-attribute-value {
+        color: #ce9178;
+    }
+
+    .xml-text-content {
+        color: #d4d4d4;
+    }
+
+    .xml-comment {
+        color: #6a9955;
+        font-style: italic;
+    }
+
+    /* Scrollbar styling for dark theme */
+    .xml-viewer::-webkit-scrollbar {
+        width: 12px;
+        height: 12px;
+    }
+
+    .xml-viewer::-webkit-scrollbar-track {
+        background: #1e1e1e;
+    }
+
+    .xml-viewer::-webkit-scrollbar-thumb {
+        background: #424242;
+        border-radius: 6px;
+    }
+
+        .xml-viewer::-webkit-scrollbar-thumb:hover {
+            background: #4e4e4e;
+        }
+</style>
+
+@code {
+    [CascadingParameter]
+    private MudBlazor.MudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public TransactionData? Transaction { get; set; }
+
+    [Parameter]
+    public string? XmlType { get; set; }
+
+    private string formattedXml = string.Empty;
+    private string? errorMessage;
+    private int lineCount = 0;
+    private string rawXml = string.Empty;
+
+    protected override void OnInitialized()
+    {
+        FormatAndHighlightXml();
+    }
+
+    private void FormatAndHighlightXml()
+    {
+        rawXml = GetXmlContent();
+
+        if (string.IsNullOrWhiteSpace(rawXml) ||
+            rawXml.Contains("No data available") ||
+            (rawXml.Contains("No ") && rawXml.Contains(" XML available")))
+        {
+            errorMessage = rawXml;
+            return;
+        }
+
+        try
+        {
+            // Clean the XML string
+            var cleanedXml = CleanXmlString(rawXml);
+
+            // Parse and beautify XML
+            var doc = XDocument.Parse(cleanedXml);
+
+            var settings = new XmlWriterSettings
+            {
+                Indent = true,
+                IndentChars = "  ",
+                NewLineChars = "\n",
+                OmitXmlDeclaration = doc.Declaration == null
+            };
+
+            using var stringWriter = new System.IO.StringWriter();
+            using var xmlWriter = XmlWriter.Create(stringWriter, settings);
+            doc.Save(xmlWriter);
+            xmlWriter.Flush();
+
+            var beautified = stringWriter.ToString();
+
+            // Add XML declaration if present
+            if (doc.Declaration != null)
+            {
+                beautified = $"<?xml version=\"{doc.Declaration.Version}\" encoding=\"{doc.Declaration.Encoding}\"?>\n{beautified}";
+            }
+
+            formattedXml = ApplySyntaxHighlighting(beautified);
+            lineCount = beautified.Split('\n').Length;
+
+            // Update rawXml with cleaned version for copy/download
+            rawXml = beautified;
+        }
+        catch (Exception ex)
+        {
+            // If parsing fails, try to display as plain text with highlighting
+            try
+            {
+                var cleanedXml = CleanXmlString(rawXml);
+                formattedXml = ApplySyntaxHighlighting(System.Net.WebUtility.HtmlEncode(cleanedXml));
+                lineCount = cleanedXml.Split('\n').Length;
+                errorMessage = $"Warning: XML may have formatting issues. Displaying as plain text. Error: {ex.Message}";
+            }
+            catch
+            {
+                errorMessage = $"Failed to parse XML: {ex.Message}";
+            }
+        }
+    }
+
+    private string CleanXmlString(string xml)
+    {
+        if (string.IsNullOrWhiteSpace(xml))
+            return xml;
+
+        // Remove BOM if present
+        xml = xml.Trim('\uFEFF', '\u200B');
+
+        // Fix common escape sequence issues
+        xml = xml.Replace("\\'", "'");
+        xml = xml.Replace("\\\"", "\"");
+        xml = xml.Replace("\\\\", "\\");
+
+        // Remove any leading/trailing whitespace
+        xml = xml.Trim();
+
+        // If the XML is wrapped in quotes, unwrap it
+        if (xml.StartsWith("\"") && xml.EndsWith("\""))
+        {
+            xml = xml.Substring(1, xml.Length - 2);
+        }
+        if (xml.StartsWith("'") && xml.EndsWith("'"))
+        {
+            xml = xml.Substring(1, xml.Length - 2);
+        }
+
+        return xml;
+    }
+
+    private string GetXmlContent()
+    {
+        if (Transaction == null) return "No data available";
+
+        return XmlType switch
+        {
+            "Request XML" => Transaction.RequestXML ?? "No request XML available",
+            "Response XML" => Transaction.ResponseXML ?? "No response XML available",
+            _ => "Unknown XML type"
+        };
+    }
+
+    private string ApplySyntaxHighlighting(string xml)
+    {
+        // Escape HTML
+        xml = System.Net.WebUtility.HtmlEncode(xml);
+
+        // Highlight XML declaration
+        xml = System.Text.RegularExpressions.Regex.Replace(xml,
+            @"(&lt;\?xml[^?]*\?&gt;)",
+            match => $"<span class='xml-declaration'>{match.Groups[1].Value}</span>");
+
+        // Highlight comments
+        xml = System.Text.RegularExpressions.Regex.Replace(xml,
+            @"(&lt;!--.*?--&gt;)",
+            match => $"<span class='xml-comment'>{match.Groups[1].Value}</span>",
+            System.Text.RegularExpressions.RegexOptions.Singleline);
+
+        // Highlight opening tags with attributes
+        xml = System.Text.RegularExpressions.Regex.Replace(xml,
+            @"(&lt;)(\w+)((?:\s+\w+(?:=&quot;[^&quot;]*&quot;)?)*\s*)(/?)(&gt;)",
+            match =>
+            {
+                var openBracket = $"<span class='xml-tag-bracket'>{match.Groups[1].Value}</span>";
+                var tagName = $"<span class='xml-tag-name'>{match.Groups[2].Value}</span>";
+                var attributes = HighlightAttributes(match.Groups[3].Value);
+                var slash = match.Groups[4].Success ? $"<span class='xml-tag-slash'>{match.Groups[4].Value}</span>" : "";
+                var closeBracket = $"<span class='xml-tag-bracket'>{match.Groups[5].Value}</span>";
+                return openBracket + tagName + attributes + slash + closeBracket;
+            });
+
+        // Highlight closing tags
+        xml = System.Text.RegularExpressions.Regex.Replace(xml,
+            @"(&lt;/)(\w+)(&gt;)",
+            match =>
+            {
+                var openBracket = $"<span class='xml-tag-bracket'>{match.Groups[1].Value}</span>";
+                var tagName = $"<span class='xml-tag-name'>{match.Groups[2].Value}</span>";
+                var closeBracket = $"<span class='xml-tag-bracket'>{match.Groups[3].Value}</span>";
+                return openBracket + tagName + closeBracket;
+            });
+
+        return xml;
+    }
+
+    private string HighlightAttributes(string attributes)
+    {
+        if (string.IsNullOrWhiteSpace(attributes))
+            return attributes;
+
+        // Highlight attribute name and value
+        attributes = System.Text.RegularExpressions.Regex.Replace(attributes,
+            @"(\w+)(=)(&quot;[^&quot;]*&quot;)",
+            match =>
+            {
+                var attrName = $"<span class='xml-attribute-name'>{match.Groups[1].Value}</span>";
+                var equals = $"<span class='xml-attribute-equals'>{match.Groups[2].Value}</span>";
+                var attrValue = $"<span class='xml-attribute-value'>{match.Groups[3].Value}</span>";
+                return attrName + equals + attrValue;
+            });
+
+        return attributes;
+    }
+
+    private async Task CopyToClipboard()
+    {
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", rawXml);
+        }
+        catch
+        {
+            // Silently fail if clipboard API is not available
+        }
+    }
+
+    private async Task DownloadXml()
+    {
+        try
+        {
+            var fileName = $"{Transaction?.TrackingId}_{XmlType?.Replace(" ", "_")}.xml";
+            var bytes = System.Text.Encoding.UTF8.GetBytes(rawXml);
+            var base64 = Convert.ToBase64String(bytes);
+
+            await JS.InvokeVoidAsync("downloadFileFromStream", fileName, "application/xml", base64);
+        }
+        catch
+        {
+            // Silently fail
+        }
+    }
+
+    private void Close() => MudDialog?.Close();
+} *@
+
+@* @using MongoBlazor.Model
+@using MudBlazor
+@using System.Xml.Linq
+@using System.Xml
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.h6" Class="mb-3">
+            Tracking Id: <strong>@Transaction?.TrackingId</strong>
+        </MudText>
+        <MudPaper Class="pa-3 xml-box" Elevation="0">
+            <pre class="xml-content">@((MarkupString)FormatXml(GetXmlContent()))</pre>
+        </MudPaper>
+    </DialogContent>
+    <DialogActions>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled" OnClick="Close">Close</MudButton>
+        <MudButton Color="Color.Secondary" Variant="Variant.Outlined" OnClick="CopyToClipboard">Copy</MudButton>
+    </DialogActions>
+</MudDialog>
+
+<style>
+    .xml-box {
+        background-color: #1e1e1e;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        max-height: 500px;
+        overflow: auto;
+    }
+
+    .xml-content {
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        max-height: 500px;
+        overflow-y: auto;
+        margin: 0;
+        font-family: 'Consolas', 'Courier New', monospace;
+        font-size: 13px;
+        line-height: 1.6;
+        color: #d4d4d4;
+    }
+
+    /* XML Syntax Highlighting */
+    .xml-tag {
+        color: #569cd6;
+    }
+
+    .xml-attribute {
+        color: #9cdcfe;
+    }
+
+    .xml-attribute-value {
+        color: #ce9178;
+    }
+
+    .xml-text {
+        color: #d4d4d4;
+    }
+
+    .xml-comment {
+        color: #6a9955;
+    }
+</style>
+
+@code {
+    [CascadingParameter]
+    private MudBlazor.MudDialogInstance MudDialog { get; set; } = default!;
+
+    [Parameter]
+    public TransactionData? Transaction { get; set; }
+
+    [Parameter]
+    public string? XmlType { get; set; }
+
+    private string GetXmlContent()
+    {
+        if (Transaction == null) return "No data available";
+
+        return XmlType switch
+        {
+            "Request XML" => Transaction.RequestXML ?? "No request XML available",
+            "Response XML" => Transaction.ResponseXML ?? "No response XML available",
+            _ => "Unknown XML type"
+        };
+    }
+
+    private string FormatXml(string xml)
+    {
+        if (string.IsNullOrWhiteSpace(xml) || xml == "No data available" || xml.Contains("No ") && xml.Contains(" XML available"))
+            return xml;
+
+        try
+        {
+            // Parse and format XML with indentation
+            var doc = XDocument.Parse(xml);
+            var formatted = doc.ToString();
+
+            // Apply syntax highlighting
+            return ApplySyntaxHighlighting(formatted);
+        }
+        catch
+        {
+            // If XML parsing fails, return as-is
+            return System.Net.WebUtility.HtmlEncode(xml);
+        }
+    }
+
+    private string ApplySyntaxHighlighting(string xml)
+    {
+        // Escape HTML first
+        xml = System.Net.WebUtility.HtmlEncode(xml);
+
+        // Highlight XML tags
+        xml = System.Text.RegularExpressions.Regex.Replace(xml,
+            @"&lt;(/?)(\w+)",
+            match => $"&lt;<span class='xml-tag'>{match.Groups[1].Value}{match.Groups[2].Value}</span>");
+
+        // Highlight closing tag bracket
+        xml = System.Text.RegularExpressions.Regex.Replace(xml,
+            @"(/?)&gt;",
+            match => $"<span class='xml-tag'>{match.Groups[1].Value}&gt;</span>");
+
+        // Highlight attributes
+        xml = System.Text.RegularExpressions.Regex.Replace(xml,
+            @"(\w+)=",
+            match => $"<span class='xml-attribute'>{match.Groups[1].Value}</span>=");
+
+        // Highlight attribute values
+        xml = System.Text.RegularExpressions.Regex.Replace(xml,
+            @"&quot;([^&quot;]*)&quot;",
+            match => $"<span class='xml-attribute-value'>&quot;{match.Groups[1].Value}&quot;</span>");
+
+        // Highlight comments
+        xml = System.Text.RegularExpressions.Regex.Replace(xml,
+            @"&lt;!--(.*)--&gt;",
+            match => $"<span class='xml-comment'>&lt;!--{match.Groups[1].Value}--&gt;</span>");
+
+        return xml;
+    }
+
+    private void Close() => MudDialog?.Close();
+
+    private void CopyToClipboard()
+    {
+        MudDialog?.Close();
+    }
+} *@

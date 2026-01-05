@@ -59,7 +59,7 @@
 
 
             <!-- DAILY COUNT -->
-            <MudItem xs="12" md="4">
+            <MudItem xs="12" md="8">
                 <MudCard>
                     <MudCardHeader><b>Daily Count</b></MudCardHeader>
                     <MudCardContent>
@@ -67,7 +67,7 @@
                         <MudChart ChartType="ChartType.Bar"
                                   ChartSeries="@dailySeries"
                                   XAxisLabels="@dailyLabels"
-                                  Height="300px" />
+                                   />
 
                     </MudCardContent>
                 </MudCard>
@@ -154,20 +154,7 @@
             </MudItem>
 
 
-            <!-- FAILURE REASONS -->
-            <MudItem xs="12" md="12">
-                <MudCard>
-                    <MudCardHeader><b>Failure Reason Breakdown</b></MudCardHeader>
-                    <MudCardContent>
-
-                        <MudChart ChartType="ChartType.Bar"
-                                  ChartSeries="@failureSeries"
-                                  XAxisLabels="@failureLabels"
-                                  Height="320px" />
-
-                    </MudCardContent>
-                </MudCard>
-            </MudItem>
+           
 
             <MudItem xs="12" md="12">
     <MudCard>
@@ -176,10 +163,10 @@
 
                         <MudSelect T="string"
                                    Label="Period"
-                                   @bind-Value="periodMode"
+                                   Value="@periodMode"
+                                   ValueChanged="@OnPeriodChanged"
                                    Dense="true"
-                                   AnchorOrigin="Origin.BottomCenter"
-                                   onchange="LoadStatusTrendAsync">
+                                   AnchorOrigin="Origin.BottomCenter">
 
                             <MudSelectItem Value="@("Daily")">Daily</MudSelectItem>
                             <MudSelectItem Value="@("Weekly")">Weekly</MudSelectItem>
@@ -208,7 +195,6 @@
 @code {
     bool isLoading = true;
     string? error;
-    MudChart? statusPie;
 
     string[] statusLabels = Array.Empty<string>();
     double[] statusValues = Array.Empty<double>();
@@ -240,7 +226,6 @@
     List<ChartSeries> monthlySeries = new();
     List<ChartSeries> trendSeries = new();
     List<ChartSeries> responseTimeSeries = new();
-    List<ChartSeries> failureSeries = new();
     List<ChartSeries> hourRateSeries = new();
     List<ChartSeries> pendingAgingSeries = new();
 
@@ -249,7 +234,11 @@
     string[] statusTrendLabels = Array.Empty<string>();
     List<ChartSeries> statusTrendSeries = new();
 
-
+    private async Task OnPeriodChanged(string value)
+    {
+        periodMode = value;
+        await LoadStatusTrendAsync();
+    }
     async Task LoadStatusTrendAsync()
     {
         List<StatusTrendResult> data = periodMode switch
@@ -379,18 +368,7 @@
             };
 
 
-            var fails = await Service.GetFailureReasonsAsync();
-            failureLabels = fails.Select(x => x.Label).ToArray();
-            failureCounts = fails.Select(x => (double)x.Count).ToArray();
-
-            failureSeries = new()
-            {
-                new ChartSeries
-                {
-                    Name = "Failures",
-                    Data = failureCounts
-                }
-            };
+            
 
             await InvokeAsync(StateHasChanged);
             await LoadStatusTrendAsync();
