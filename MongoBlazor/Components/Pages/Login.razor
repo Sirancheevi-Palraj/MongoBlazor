@@ -1,0 +1,177 @@
+﻿@page "/login"
+@layout LoginLayout
+@using MongoBlazor.Model
+@using MongoBlazor.Services
+@using MudBlazor
+@inject AuthService AuthService
+@inject SessionService SessionService
+@inject NavigationManager Navigation
+@inject ISnackbar Snackbar
+
+<PageTitle>Login</PageTitle>
+
+<MudContainer MaxWidth="MaxWidth.Small" Class="d-flex align-center justify-center" Style="min-height: 100vh;">
+    <MudPaper Elevation="8" Class="pa-8" Style="width: 100%; max-width: 450px; border-radius: 16px;">
+        <MudStack Spacing="4">
+            <MudStack Spacing="2" AlignItems="AlignItems.Center">
+                <MudAvatar Color="Color.Primary" Size="Size.Large" Style="width: 80px; height: 80px;">
+                    <MudIcon Icon="@Icons.Material.Filled.Lock" Size="Size.Large" />
+                </MudAvatar>
+                <MudText Typo="Typo.h4" Align="Align.Center">
+                    Welcome Back
+                </MudText>
+                <MudText Typo="Typo.body2" Align="Align.Center" Color="Color.Secondary">
+                    Sign in to continue to your dashboard
+                </MudText>
+            </MudStack>
+
+            @if (_isLoading)
+            {
+                <MudProgressLinear Color="Color.Primary" Indeterminate="true" />
+            }
+
+            <MudForm @ref="_form" @bind-IsValid="_isValid">
+                <MudStack Spacing="3">
+                    <MudTextField @bind-Value="_loginRequest.Username"
+                                  Label="Username"
+                                  Variant="Variant.Outlined"
+                                  Required="true"
+                                  RequiredError="Username is required"
+                                  Adornment="Adornment.Start"
+                                  AdornmentIcon="@Icons.Material.Filled.Person"
+                                  AdornmentColor="Color.Primary" />
+
+                    <MudTextField @bind-Value="_loginRequest.Password"
+                                  Label="Password"
+                                  Variant="Variant.Outlined"
+                                  InputType="@_passwordInput"
+                                  Required="true"
+                                  RequiredError="Password is required"
+                                  Adornment="Adornment.End"
+                                  AdornmentIcon="@_passwordIcon"
+                                  OnAdornmentClick="TogglePasswordVisibility"
+                                  AdornmentAriaLabel="Show Password"
+                                  AdornmentColor="Color.Primary" />
+
+                    <MudCheckBox @bind-Value="_loginRequest.RememberMe"
+                                 Label="Remember Me"
+                                 Color="Color.Primary"
+                                 Dense="true" />
+
+                    <MudButton Variant="Variant.Filled"
+                               Color="Color.Primary"
+                               FullWidth="true"
+                               Size="Size.Large"
+                               OnClick="HandleLogin"
+                               Disabled="_isLoading"
+                               Style="height: 48px; margin-top: 8px;">
+                        @if (_isLoading)
+                        {
+                            <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                            <span>Signing In...</span>
+                        }
+                        else
+                        {
+                            <text>Sign In</text>
+                        }
+                    </MudButton>
+                </MudStack>
+            </MudForm>
+
+            <MudDivider />
+
+            <MudPaper Elevation="0" Class="pa-3" Style="background-color: #f5f5f5; border-radius: 8px;">
+                <MudStack Spacing="1">
+                    <MudText Typo="Typo.caption" Align="Align.Center" Style="font-weight: 500;">
+                        Default Credentials
+                    </MudText>
+                    <MudText Typo="Typo.caption" Align="Align.Center" Color="Color.Secondary">
+                        Username: <strong>admin</strong> | Password: <strong>Admin@123</strong>
+                    </MudText>
+                </MudStack>
+            </MudPaper>
+        </MudStack>
+    </MudPaper>
+</MudContainer>
+
+@code {
+    private MudForm _form = null!;
+    private bool _isValid;
+    private bool _isLoading;
+    private LoginRequest _loginRequest = new();
+    private InputType _passwordInput = InputType.Password;
+    private string _passwordIcon = Icons.Material.Filled.VisibilityOff;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Check if already logged in
+        if (await SessionService.IsAuthenticatedAsync())
+        {
+            Navigation.NavigateTo("/", true);
+            return;
+        }
+
+        // Ensure admin user exists
+        await AuthService.EnsureAdminUserExists();
+    }
+
+    private void TogglePasswordVisibility()
+    {
+        if (_passwordInput == InputType.Password)
+        {
+            _passwordInput = InputType.Text;
+            _passwordIcon = Icons.Material.Filled.Visibility;
+        }
+        else
+        {
+            _passwordInput = InputType.Password;
+            _passwordIcon = Icons.Material.Filled.VisibilityOff;
+        }
+    }
+
+    private async Task HandleLogin()
+    {
+        await _form.Validate();
+        if (!_isValid)
+            return;
+
+        _isLoading = true;
+        StateHasChanged();
+
+        try
+        {
+            var user = await AuthService.ValidateUserAsync(_loginRequest.Username, _loginRequest.Password);
+
+            if (user != null)
+            {
+                var session = new UserSession
+                {
+                    UserId = user.Id,
+                    Username = user.Username,
+                    FullName = user.FullName,
+                    Role = user.Role,
+                    LoginTime = DateTime.UtcNow
+                };
+
+                await SessionService.SetSessionAsync(session);
+                Snackbar.Add($"Welcome back, {user.FullName ?? user.Username}!", Severity.Success);
+
+                // Navigate to home page
+                Navigation.NavigateTo("/", true);
+            }
+            else
+            {
+                Snackbar.Add("Invalid username or password", Severity.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Login failed: {ex.Message}", Severity.Error);
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+}

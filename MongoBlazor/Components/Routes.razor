@@ -1,7 +1,51 @@
-﻿<Router AppAssembly="typeof(Program).Assembly">
+﻿@using Microsoft.AspNetCore.Components.Routing
+@using MongoBlazor.Services
+@inject AuthService AuthService
+@inject SessionService SessionService
+@inject NavigationManager Navigation
+
+<Router AppAssembly="typeof(Program).Assembly">
     <Found Context="routeData">
-        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+            <Authorizing>
+                <MudProgressCircular Indeterminate="true" />
+            </Authorizing>
+            <NotAuthorized>
+                @{
+                    NavigateToLogin();
+                }
+            </NotAuthorized>
+        </AuthorizeRouteView>
         <FocusOnNavigate RouteData="routeData" Selector="h1" />
     </Found>
 </Router>
 
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        // Check if login is enabled
+        if (AuthService.IsLoginEnabled)
+        {
+            var currentUri = Navigation.Uri;
+            var isLoginPage = currentUri.Contains("/login", StringComparison.OrdinalIgnoreCase);
+            
+            // If not on login page, check authentication
+            if (!isLoginPage)
+            {
+                var isAuthenticated = await SessionService.IsAuthenticatedAsync();
+                if (!isAuthenticated)
+                {
+                    Navigation.NavigateTo("/login", true);
+                }
+            }
+        }
+    }
+
+    private void NavigateToLogin()
+    {
+        if (AuthService.IsLoginEnabled)
+        {
+            Navigation.NavigateTo("/login", true);
+        }
+    }
+}

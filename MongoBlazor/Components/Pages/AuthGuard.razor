@@ -1,0 +1,43 @@
+﻿@using MongoBlazor.Services
+@inject AuthService AuthService
+@inject SessionService SessionService
+@inject NavigationManager Navigation
+
+@if (_isAuthenticated || !_isLoginEnabled)
+{
+    @ChildContent
+}
+else if (_isChecking)
+{
+    <MudProgressCircular Indeterminate="true" />
+}
+
+@code {
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    private bool _isAuthenticated;
+    private bool _isChecking = true;
+    private bool _isLoginEnabled;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isLoginEnabled = AuthService.IsLoginEnabled;
+
+        if (_isLoginEnabled)
+        {
+            _isAuthenticated = await SessionService.IsAuthenticatedAsync();
+
+            if (!_isAuthenticated)
+            {
+                var uri = new Uri(Navigation.Uri);
+                if (!uri.AbsolutePath.Equals("/login", StringComparison.OrdinalIgnoreCase))
+                {
+                    Navigation.NavigateTo("/login", true);
+                }
+            }
+        }
+
+        _isChecking = false;
+    }
+}
