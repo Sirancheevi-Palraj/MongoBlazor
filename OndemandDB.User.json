@@ -1,0 +1,11 @@
+[{
+  "_id": "ObjectId",
+  "Username": "admin",
+  "PasswordHash": "hashed_password",
+  "Email": "admin@example.com",
+  "FullName": "Administrator",
+  "Role": "Admin",
+  "IsActive": true,
+  "CreatedAt": "2025-01-05T10:00:00Z",
+  "LastLoginAt": "2025-01-05T12:30:00Z"
+}]
