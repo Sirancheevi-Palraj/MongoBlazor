@@ -14,11 +14,11 @@
     <link rel="stylesheet" href="MongoBlazor.styles.css" />
     <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="BpaWebApp.styles.css" />
-    <HeadOutlet @rendermode="InteractiveServer" />
+    <HeadOutlet />
 </head>
 
 <body>
-    <Routes @rendermode="InteractiveServer" />
+    <Routes />
     <script src="_framework/blazor.web.js"></script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
     <script>
@@ -30,6 +30,16 @@
             link.click();
             document.body.removeChild(link);
         };
+                window.columnStorage = {
+            save: function (key, value) {
+                localStorage.setItem(key, JSON.stringify(value));
+            },
+            load: function (key) {
+                const data = localStorage.getItem(key);
+                return data ? JSON.parse(data) : null;
+            }
+        };
+
     </script>
 </body>
 

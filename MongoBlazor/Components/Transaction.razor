@@ -30,7 +30,7 @@
                 <MudSelectItem Value="@("FAILURE")">Failure</MudSelectItem>
             </MudSelect>
 
-            <MudDatePicker @bind-Date="_startDate"
+   @*          <MudDatePicker @bind-Date="_startDate"
                            Label="Start Date"
                            DateFormat="dd-MMM-yyyy"
                            Clearable="true"
@@ -40,7 +40,19 @@
                            Label="End Date"
                            DateFormat="dd-MMM-yyyy"
                            Clearable="true"
-                           Class="w-200" />
+                           Class="w-200" /> *@
+            <!-- SINGLE DATE + TIME CONTROLS -->
+            <MudTextField @bind-Value="_startDateTimeLocal"
+                          Label="Start Date & Time"
+                          InputType="InputType.DateTimeLocal"
+                          Clearable="true"
+                          Class="w-300" />
+
+            <MudTextField @bind-Value="_endDateTimeLocal"
+                          Label="End Date & Time"
+                          InputType="InputType.DateTimeLocal"
+                          Clearable="true"
+                          Class="w-300" />
 
             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ApplyFilter">Apply</MudButton>
             <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="ClearFilter">Reset</MudButton>
@@ -130,10 +142,24 @@
     private string _search = "";
     private string _filterStatus = "All";
     private bool _isLoading = true;
+    private string? _startDateTimeLocal;
+    private string? _endDateTimeLocal;
+
 
     protected override async Task OnInitializedAsync()
     {
         await LoadData();
+    }
+
+    private void MapDateTimeLocalToDateTime()
+    {
+        _startDate = DateTime.TryParse(_startDateTimeLocal, out var start)
+            ? start
+            : null;
+
+        _endDate = DateTime.TryParse(_endDateTimeLocal, out var end)
+            ? end
+            : null;
     }
 
     private async Task LoadData()
@@ -176,6 +202,8 @@
     private async Task ApplyFilter()
     {
         // Reload data from server with current filters
+        MapDateTimeLocalToDateTime();   // 🔥 IMPORTANT
+
         await LoadData();
     }
 
