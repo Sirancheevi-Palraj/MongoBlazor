@@ -1,0 +1,198 @@
+﻿@page "/users"
+@using MongoBlazor.Model
+@using MongoBlazor.Services
+@using MudBlazor
+@inject UserService UserService
+@inject AuthService AuthService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+
+<MudPaper Class="pa-4" Style="max-width:1200px;margin:auto;">
+
+    <MudStack Row AlignItems="AlignItems.Center" Spacing="2" Class="mb-3">
+        <MudText Typo="Typo.h5">User Management</MudText>
+        <MudSpacer />
+        <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="OpenCreateDialog">
+            + Create User
+        </MudButton>
+    </MudStack>
+
+    <MudTable Items="_users" Dense="true" Hover="true" Striped="true" Bordered="true">
+        <HeaderContent>
+            <MudTh>Username</MudTh>
+            <MudTh>Full Name</MudTh>
+            <MudTh>Email</MudTh>
+            <MudTh>Role</MudTh>
+            <MudTh>Status</MudTh>
+            <MudTh>Created</MudTh>
+            <MudTh style="width:150px;">Actions</MudTh>
+        </HeaderContent>
+
+        <RowTemplate Context="u">
+            <MudTd>@u.Username</MudTd>
+            <MudTd>@u.FullName</MudTd>
+            <MudTd>@u.Email</MudTd>
+            <MudTd>@u.Role</MudTd>
+
+            <MudTd>
+                <MudChip T="bool"
+                         Color="@(u.IsActive ? Color.Success : Color.Error)"
+                         Size="Size.Small">
+                    @(u.IsActive ? "Active" : "Inactive")
+                </MudChip>
+            </MudTd>
+
+            <MudTd>@u.CreatedAt.ToLocalTime().ToString("dd-MMM-yyyy")</MudTd>
+
+            <MudTd>
+                <MudIconButton Icon="@Icons.Material.Filled.Edit"
+                               Color="Color.Primary"
+                               OnClick="@(() => OpenEditDialog(u))" />
+
+                <MudIconButton Icon="@Icons.Material.Filled.Delete"
+                               Color="Color.Error"
+                               OnClick="@(() => DeleteUser(u))" />
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+
+</MudPaper>
+
+@code {
+    private List<User> _users = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadUsers();
+    }
+
+    private async Task LoadUsers()
+    {
+        _users = await UserService.GetUsersAsync();
+    }
+
+    private async Task OpenCreateDialog()
+    {
+        var model = new UserUpsertModel
+        {
+            Role = "User",
+            IsActive = true
+        };
+
+        var parameters = new DialogParameters
+        {
+            ["Model"] = model
+        };
+
+        var options = new DialogOptions
+        {
+            CloseButton = true,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true
+        };
+
+        var dialog = DialogService.Show<UserUpsertDialog>("Create User", parameters, options);
+        var result = await dialog.Result;
+
+        if (result.Canceled) return;
+
+        var data = (UserUpsertModel)result.Data!;
+
+        if (string.IsNullOrWhiteSpace(data.Username))
+        {
+            Snackbar.Add("Username is required", Severity.Error);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(data.Password))
+        {
+            Snackbar.Add("Password is required", Severity.Error);
+            return;
+        }
+
+        var exists = await UserService.UsernameExistsAsync(data.Username.Trim());
+        if (exists)
+        {
+            Snackbar.Add("Username already exists", Severity.Error);
+            return;
+        }
+
+        var user = new User
+        {
+            Username = data.Username.Trim(),
+            Password = data.Password, // ✅ plain
+            FullName = data.FullName,
+            Email = data.Email,
+            Role = data.Role,
+            IsActive = data.IsActive,
+            CreatedAt = DateTime.UtcNow
+        };
+
+        await UserService.CreateAsync(user);
+
+        Snackbar.Add("User created successfully", Severity.Success);
+        await LoadUsers();
+        StateHasChanged();
+    }
+
+    private async Task OpenEditDialog(User u)
+    {
+        var model = new UserUpsertModel
+        {
+            Id = u.Id,
+            Username = u.Username,
+            FullName = u.FullName,
+            Email = u.Email,
+            Role = u.Role,
+            IsActive = u.IsActive
+        };
+
+        var parameters = new DialogParameters
+        {
+            ["Model"] = model
+        };
+
+        var options = new DialogOptions
+        {
+            CloseButton = true,
+            MaxWidth = MaxWidth.Small,
+            FullWidth = true
+        };
+
+        var dialog = DialogService.Show<UserUpsertDialog>("Edit User", parameters, options);
+        var result = await dialog.Result;
+
+        if (result.Canceled) return;
+
+        var data = (UserUpsertModel)result.Data!;
+
+        // update fields
+        u.FullName = data.FullName;
+        u.Email = data.Email;
+        u.Role = data.Role;
+        u.IsActive = data.IsActive;
+
+        await UserService.UpdateAsync(u);
+
+        Snackbar.Add("User updated successfully", Severity.Success);
+        await LoadUsers();
+        StateHasChanged();
+    }
+
+    private async Task DeleteUser(User u)
+    {
+        bool? confirm = await DialogService.ShowMessageBox(
+            "Delete User",
+            $"Are you sure you want to delete '{u.Username}'?",
+            yesText: "Delete",
+            cancelText: "Cancel");
+
+        if (confirm != true) return;
+
+        await UserService.DeleteAsync(u.Id!);
+
+        Snackbar.Add("User deleted successfully", Severity.Success);
+        await LoadUsers();
+        StateHasChanged();
+    }
+}

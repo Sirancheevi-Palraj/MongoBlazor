@@ -1,0 +1,46 @@
+﻿@using MongoBlazor.Model
+@using MudBlazor
+@inject IJSRuntime JS
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.h6">Column Settings</MudText>
+        <MudDivider Class="my-2" />
+
+        @foreach (var col in Columns)
+        {
+            <MudCheckBox T="bool"
+                         Value="col.Visible"
+                         ValueChanged="@(async (bool value) => await OnCheckedChanged(col, value))"
+                         Label="@col.Title"
+                         Dense="true" />
+        }
+    </DialogContent>
+
+    <DialogActions>
+        <MudButton Color="Color.Secondary" OnClick="Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" OnClick="Save">Apply</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private const string StorageKey = "transaction_columns_v1";
+
+    [CascadingParameter] private IMudDialogInstance MudDialog { get; set; } = default!;
+    [Parameter] public List<ColumnSetting> Columns { get; set; } = new();
+
+    private async Task OnCheckedChanged(ColumnSetting col, bool value)
+    {
+        col.Visible = value;
+
+        var enabledKeys = Columns
+            .Where(x => x.Visible)
+            .Select(x => x.Key)
+            .ToList();
+
+        await JS.InvokeVoidAsync("columnStorage.save", StorageKey, enabledKeys);
+    }
+
+    void Save() => MudDialog.Close(DialogResult.Ok(true));
+    void Cancel() => MudDialog.Cancel();
+}

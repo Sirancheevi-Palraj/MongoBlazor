@@ -1,7 +1,440 @@
 ﻿@page "/"
+@inherits BasePage
+@inject TransactionService Service
+@using MongoBlazor.Model
+@using MongoBlazor.Services
+@using MudBlazor
+@using System.Text.Json
 
-<PageTitle>Home</PageTitle>
+<MudPaper Class="pa-4" Style="max-width:1600px;margin:auto">
 
-<h1>Hello, world!</h1>
+    <MudText Typo="Typo.h5" Class="fw-bold mb-2">
+        Transaction Analytics Dashboard
+    </MudText>
 
-Welcome to your new app.
+    <MudDivider Class="mb-3" />
+
+    @if (isLoading)
+    {
+        <MudProgressCircular Indeterminate />
+        <div class="mt-2">Loading dashboard...</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(error))
+    {
+        <MudAlert Severity="Severity.Error">@error</MudAlert>
+    }
+    else
+    {
+        
+        <MudCard Class="mb-3">
+            <MudCardContent>
+                <MudText Typo="Typo.subtitle2">Debug: Status labels: @statusLabels.Length, Status values: @statusValues.Length</MudText>
+                <MudText Typo="Typo.caption">Sample status payload: @JsonSerializer.Serialize(statusValues.Take(5))</MudText>
+            </MudCardContent>
+        </MudCard>
+
+        <MudGrid>
+
+            <!-- STATUS PIE -->
+            <!-- STATUS PIE -->
+            
+            <!-- DAILY COUNT -->
+            <MudItem xs="12" md="4">
+
+                <MudCard>
+                    <MudCardHeader><b>Over All Count</b></MudCardHeader>
+                    <MudCardContent>
+
+                        <MudChart ChartType="ChartType.Pie"
+                                  InputData="@statusValues"
+                                  InputLabels="@statusLabels"
+                                  />
+
+                    </MudCardContent>
+
+                </MudCard>
+            </MudItem>
+
+
+
+
+
+            <!-- DAILY COUNT -->
+            <MudItem xs="12" md="8">
+                <MudCard>
+                    <MudCardHeader><b>Daily Count</b></MudCardHeader>
+                    <MudCardContent>
+
+                        <MudChart ChartType="ChartType.Bar"
+                                  ChartSeries="@dailySeries"
+                                  XAxisLabels="@dailyLabels"
+                                   />
+
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+
+            <!-- MONTHLY COUNT -->
+            <MudItem xs="12" md="4">
+                <MudCard>
+                    <MudCardHeader><b>Monthly Count</b></MudCardHeader>
+                    <MudCardContent>
+
+                        <MudChart ChartType="ChartType.Bar"
+                                  ChartSeries="@monthlySeries"
+                                  XAxisLabels="@monthlyLabels"
+                                  Height="300px" />
+
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+
+            <!-- TREND OVER TIME -->
+            <MudItem xs="12" md="6">
+                <MudCard>
+                    <MudCardHeader><b>Transaction Trend</b></MudCardHeader>
+                    <MudCardContent>
+
+                        <MudChart ChartType="ChartType.Line"
+                                  ChartSeries="@trendSeries"
+                                  XAxisLabels="@trendLabels"
+                                  Height="320px" />
+
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+
+            <!-- RESPONSE TIME -->
+            <MudItem xs="12" md="6">
+                <MudCard>
+                    <MudCardHeader><b>Response Time Distribution</b></MudCardHeader>
+                    <MudCardContent>
+
+                        <MudChart ChartType="ChartType.Bar"
+                                  ChartSeries="@responseTimeSeries"
+                                  XAxisLabels="@timeBuckets"
+                                  Height="300px" />
+
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+
+            <!-- SUCCESS RATE BY HOUR -->
+            <MudItem xs="12" md="6">
+                <MudCard>
+                    <MudCardHeader><b>Success Rate by Hour</b></MudCardHeader>
+                    <MudCardContent>
+
+                        <MudChart ChartType="ChartType.Line"
+                                  ChartSeries="@hourRateSeries"
+                                  XAxisLabels="@hourLabels"
+                                  Height="300px" />
+
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+
+            <!-- PENDING AGING -->
+            <MudItem xs="12" md="6">
+                <MudCard>
+                    <MudCardHeader><b>Pending Aging</b></MudCardHeader>
+                    <MudCardContent>
+
+                        <MudChart ChartType="ChartType.Bar"
+                                  ChartSeries="@pendingAgingSeries"
+                                  XAxisLabels="@pendingAgingLabels"
+                                  Height="300px" />
+
+                    </MudCardContent>
+                </MudCard>
+            </MudItem>
+
+
+           
+
+            <MudItem xs="12" md="12">
+    <MudCard>
+        <MudCardHeader>
+            <b>Status Distribution Trend</b>
+
+                        <MudSelect T="string"
+                                   Label="Period"
+                                   Value="@periodMode"
+                                   ValueChanged="@OnPeriodChanged"
+                                   Dense="true"
+                                   AnchorOrigin="Origin.BottomCenter">
+
+                            <MudSelectItem Value="@("Daily")">Daily</MudSelectItem>
+                            <MudSelectItem Value="@("Weekly")">Weekly</MudSelectItem>
+                            <MudSelectItem Value="@("Monthly")">Monthly</MudSelectItem>
+
+                        </MudSelect>
+
+
+
+        </MudCardHeader>
+
+        <MudCardContent>
+            <MudChart ChartType="ChartType.Bar"
+                      ChartSeries="@statusTrendSeries"
+                      XAxisLabels="@statusTrendLabels"
+                      Height="320px" />
+        </MudCardContent>
+    </MudCard>
+</MudItem>
+
+
+        </MudGrid>
+    }
+</MudPaper>
+
+@code {
+    bool isLoading = true;
+    string? error;
+
+    string[] statusLabels = Array.Empty<string>();
+    double[] statusValues = Array.Empty<double>();
+
+    string[] dailyLabels = Array.Empty<string>();
+    List<int> dailyCounts = new();
+
+    string[] monthlyLabels = Array.Empty<string>();
+    List<int> monthlyCounts = new();
+
+    string[] trendLabels = Array.Empty<string>();
+    double[] trendCounts = Array.Empty<double>();
+
+    string[] timeBuckets = new[] { "<1s", "1-2s", "2-3s", ">3s" };
+    double[] responseBuckets = Array.Empty<double>();
+
+    string[] hourLabels = Array.Empty<string>();
+    double[] hourSuccessRates = Array.Empty<double>();
+
+    string[] pendingAgingLabels = new[] { "<1s", "1-2s", "2-3s", ">3s" };
+    double[] pendingAgingCounts = Array.Empty<double>();
+
+    string[] failureLabels = Array.Empty<string>();
+    double[] failureCounts = Array.Empty<double>();
+    double[][] statusSeries = Array.Empty<double[]>();
+
+
+    List<ChartSeries> dailySeries = new();
+    List<ChartSeries> monthlySeries = new();
+    List<ChartSeries> trendSeries = new();
+    List<ChartSeries> responseTimeSeries = new();
+    List<ChartSeries> hourRateSeries = new();
+    List<ChartSeries> pendingAgingSeries = new();
+
+    string periodMode = "Daily";
+
+    string[] statusTrendLabels = Array.Empty<string>();
+    List<ChartSeries> statusTrendSeries = new();
+
+    private async Task OnPeriodChanged(string value)
+    {
+        periodMode = value;
+        await LoadStatusTrendAsync();
+    }
+    async Task LoadStatusTrendAsync()
+    {
+        try
+        {
+            DateTime end = DateTime.UtcNow.Date;
+            DateTime start;
+
+            // ✅ Default range by mode
+            if (periodMode == "Monthly")
+                start = new DateTime(end.Year, end.Month, 1).AddMonths(-9); // 10 months incl current
+            else if (periodMode == "Weekly")
+                start = end.AddDays(-((10 * 7) - 1)); // last 10 weeks
+            else
+                start = end.AddDays(-9); // last 10 days
+
+            // ✅ call service with start/end
+            List<StatusTrendResult> data = periodMode switch
+            {
+                "Weekly" => await Service.GetStatusWeeklyAsync(start, end),
+                "Monthly" => await Service.GetStatusMonthlyAsync(start, end),
+                _ => await Service.GetStatusDailyAsync(start, end)
+            };
+
+            // ✅ Build labels = exactly 10 buckets
+            List<string> labels = new();
+
+            if (periodMode == "Monthly")
+            {
+                var m = new DateTime(start.Year, start.Month, 1);
+                for (int i = 0; i < 10; i++)
+                {
+                    labels.Add(m.AddMonths(i).ToString("yyyy-MM"));
+                }
+            }
+            else if (periodMode == "Weekly")
+            {
+                // Week start Monday
+                DateTime GetWeekStart(DateTime dt)
+                {
+                    int diff = (7 + (dt.DayOfWeek - DayOfWeek.Monday)) % 7;
+                    return dt.Date.AddDays(-diff);
+                }
+
+                var w = GetWeekStart(start);
+                for (int i = 0; i < 10; i++)
+                {
+                    labels.Add(w.AddDays(i * 7).ToString("yyyy-MM-dd"));
+                }
+            }
+            else
+            {
+                for (int i = 0; i < 10; i++)
+                {
+                    labels.Add(start.AddDays(i).ToString("yyyy-MM-dd"));
+                }
+            }
+
+            statusTrendLabels = labels.ToArray();
+
+            double GetCount(string period, string status) =>
+                data.Where(x => x.Period == period && x.Status == status).Sum(x => x.Count);
+
+            var success = statusTrendLabels.Select(p => (double)GetCount(p, "SUCCESS")).ToArray();
+            var failed = statusTrendLabels.Select(p => (double)GetCount(p, "FAILED")).ToArray();
+            var pending = statusTrendLabels.Select(p => (double)GetCount(p, "PENDING")).ToArray();
+
+            statusTrendSeries = new()
+    {
+        new ChartSeries { Name = "SUCCESS", Data = success },
+        new ChartSeries { Name = "FAILED",  Data = failed },
+        new ChartSeries { Name = "PENDING", Data = pending }
+    };
+        }
+        catch(Exception ex)
+        {
+            string error = ex.ToString();
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            isLoading = true;
+
+            var start = DateTime.UtcNow.AddDays(-40);
+            var end = DateTime.UtcNow;
+
+            var statusData = await Service.GetStatusDistributionAsync();
+            statusLabels = statusData.Select(x => x.Label).ToArray();
+            statusValues = statusData.Select(x => (double)x.Count).ToArray();
+            statusSeries = new[] { statusValues };
+
+
+          
+            // DAILY
+            var dailyData = await Service.GetDailyCountsAsync(start, end);
+            dailyLabels = dailyData.Select(x => x.Label).ToArray();
+                        dailySeries = new()
+            {
+                new ChartSeries
+                {
+                    Name = "Transactions",
+                    Data = dailyData.Select(x => (double)x.Count).ToArray()
+                }
+            };
+
+            // MONTHLY
+            var monthlyData = await Service.GetMonthlyCountsAsync();
+            monthlyLabels = monthlyData.Select(x => x.Label).ToArray();
+            monthlySeries = new()
+{
+    new ChartSeries
+    {
+        Name = "Transactions",
+        Data = monthlyData.Select(x => (double)x.Count).ToArray()
+    }
+};
+
+            // TREND (HOURLY / TIME SERIES)
+            var trendData = await Service.GetTrendAsync();
+            trendLabels = trendData.Select(x => x.Timestamp).ToArray();
+            trendSeries = new()
+{
+    new ChartSeries
+    {
+        Name = "Count",
+        Data = trendData.Select(x => (double)x.Count).ToArray()
+    }
+};
+
+            var resp = await Service.GetResponseTimeBucketsAsync();
+            responseBuckets = timeBuckets
+                .Select(b => (double)(resp.FirstOrDefault(x => x.Label == b)?.Count ?? 0))
+                .ToArray();
+
+            responseTimeSeries = new()
+{
+    new ChartSeries
+    {
+        Name = "Responses",
+        Data = responseBuckets
+    }
+};
+
+
+            var hourData = await Service.GetSuccessRateByHourAsync();
+            hourLabels = hourData.Select(x => x.Label).ToArray();
+            hourSuccessRates = hourData.Select(x => x.Value).ToArray();
+
+            hourRateSeries = new()
+{
+    new ChartSeries
+    {
+        Name = "Success %",
+        Data = hourSuccessRates
+    }
+};
+
+
+            var aging = await Service.GetPendingAgingAsync();
+            pendingAgingCounts = pendingAgingLabels
+                .Select(b => (double)(aging.FirstOrDefault(x => x.Label == b)?.Count ?? 0))
+                .ToArray();
+
+            pendingAgingSeries = new()
+            {
+                new ChartSeries
+                {
+                    Name = "Pending",
+                    Data = pendingAgingCounts
+                }
+            };
+
+
+            
+
+            await InvokeAsync(StateHasChanged);
+            await LoadStatusTrendAsync();
+
+
+        }
+        catch (Exception ex)
+        {
+            error = "Dashboard failed to load. Please try again.";
+            Console.WriteLine($"[Dashboard Init] {ex}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+
+}

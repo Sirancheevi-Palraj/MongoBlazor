@@ -1,4 +1,5 @@
 ﻿@page "/transactions"
+@* @rendermode InteractiveServer *@
 @using MongoBlazor.Model
 @using MongoBlazor.Services
 @using MudBlazor
@@ -53,7 +54,9 @@
                           InputType="InputType.DateTimeLocal"
                           Clearable="true"
                           Class="w-300" />
-
+            <MudIconButton Icon="@Icons.Material.Filled.Settings"
+                           Color="Color.Primary"
+                           OnClick="OpenColumnSettings" />
             <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ApplyFilter">Apply</MudButton>
             <MudButton Variant="Variant.Outlined" Color="Color.Secondary" OnClick="ClearFilter">Reset</MudButton>
             <MudButton Variant="Variant.Outlined" Color="Color.Success" OnClick="DownloadExcel">Export</MudButton>
@@ -81,7 +84,7 @@
               RowsPerPage="20"
               Breakpoint="Breakpoint.Sm">
 
-        <HeaderContent>
+@*         <HeaderContent>
             <MudTh>#</MudTh>
             <MudTh><MudTableSortLabel SortBy="new Func<TransactionData, object>(x => x.TrackingId)">Tracking Id</MudTableSortLabel></MudTh>
             <MudTh><MudTableSortLabel SortBy="new Func<TransactionData, object>(x => x.Status)">Status</MudTableSortLabel></MudTh>
@@ -91,9 +94,39 @@
             <MudTh><MudTableSortLabel SortBy="new Func<TransactionData, object>(x => x.ResponseDateTime ?? DateTime.MinValue)">Response Time</MudTableSortLabel></MudTh>
             <MudTh>Time Taken</MudTh>
             <MudTh><MudTableSortLabel SortBy="new Func<TransactionData, object>(x => x.Timestamp)">Created</MudTableSortLabel></MudTh>
+        </HeaderContent> *@
+        <HeaderContent>
+            @if (IsVisible("TrackingId"))
+            {
+                <MudTh>Tracking Id</MudTh>
+            }
+            @if (IsVisible("Status"))
+            {
+                <MudTh>Status</MudTh>
+            }
+            @if (IsVisible("RequestDateTime"))
+            {
+                <MudTh>Request Time</MudTh>
+            }
+            @if (IsVisible("ResponseDateTime"))
+            {
+                <MudTh>Response Time</MudTh>
+            }
+            @if (IsVisible("TimeTaken"))
+            {
+                <MudTh>Time Taken</MudTh>
+            }
+            @if (IsVisible("Timestamp"))
+            {
+                <MudTh>Created</MudTh>
+            }
+            @if (IsVisible("Message"))
+            {
+                <MudTh>Message</MudTh>
+            }
         </HeaderContent>
 
-        <RowTemplate Context="x">
+      @*   <RowTemplate Context="x">
             <MudTd>@(_filteredRecords.IndexOf(x) + 1)</MudTd>
             <MudTd>@x.TrackingId</MudTd>
 
@@ -124,6 +157,26 @@
             <MudTd>@(x.ResponseDateTime?.ToString("dd-MMM-yyyy HH:mm:ss") ?? "-")</MudTd>
             <MudTd>@x.TimeTaken.ToString(@"hh\:mm\:ss")</MudTd>
             <MudTd>@x.Timestamp.ToString("dd-MMM-yyyy HH:mm:ss")</MudTd>
+        </RowTemplate> *@
+
+        <RowTemplate Context="x">
+            @if (IsVisible("TrackingId")) { <MudTd>@x.TrackingId</MudTd> }
+            @if (IsVisible("Status"))
+            {
+                <MudTd>
+                    <MudChip T="string"
+                             Color="@(x.Status=="SUCCESS" ? Color.Success : Color.Error)"
+                             Variant="Variant.Filled"
+                             Size="Size.Small">
+                        @x.Status
+                    </MudChip>
+                </MudTd>
+            }
+            @if (IsVisible("RequestDateTime")) { <MudTd>@x.RequestDateTime</MudTd> }
+            @if (IsVisible("ResponseDateTime")) { <MudTd>@x.ResponseDateTime</MudTd> }
+            @if (IsVisible("TimeTaken")) { <MudTd>@x.TimeTaken</MudTd> }
+            @if (IsVisible("Timestamp")) { <MudTd>@x.Timestamp</MudTd> }
+            @if (IsVisible("Message")) { <MudTd>@x.Message</MudTd> }
         </RowTemplate>
 
         <PagerContent>
@@ -145,10 +198,35 @@
     private string? _startDateTimeLocal;
     private string? _endDateTimeLocal;
 
+    private const string StorageKey = "transaction_columns_v1";
+    private List<ColumnSetting> _columns = new()
+{
+    new() { Key="TrackingId", Title="Tracking Id", Visible=true },
+    new() { Key="Status", Title="Status", Visible=true },
+    new() { Key="RequestDateTime", Title="Request Time", Visible=true },
+    new() { Key="ResponseDateTime", Title="Response Time", Visible=true },
+    new() { Key="TimeTaken", Title="Time Taken", Visible=true },
+    new() { Key="Timestamp", Title="Created", Visible=true },
+    new() { Key="Message", Title="Message", Visible=true }
+};
+
 
     protected override async Task OnInitializedAsync()
     {
-        await LoadData();
+        await LoadData(); // Load data without localStorage first
+    }
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadColumnSettings();
+            StateHasChanged(); // refresh UI with loaded column settings
+        }
+    }
+
+    private bool IsVisible(string key)
+    {
+        return _columns?.FirstOrDefault(c => c.Key == key)?.Visible ?? true;
     }
 
     private void MapDateTimeLocalToDateTime()
@@ -230,7 +308,15 @@
             ["Transaction"] = item,
             ["XmlType"] = title
         };
-        DialogService.Show<XmlViewerDialog>(title, parameters);
+
+        var options = new DialogOptions
+        {
+            MaxWidth = MaxWidth.ExtraLarge,
+            FullWidth = true,
+            CloseButton = true
+        };
+
+        DialogService.Show<XmlViewerDialog>("Transaction XML Details", parameters, options);
     }
 
     private async Task DownloadExcel()
@@ -311,4 +397,70 @@
             StateHasChanged();
         }
     }
+    private async Task OpenColumnSettings()
+    {
+        // ✅ Ensure popup always shows latest saved values
+        await ApplyLocalStorageColumnSettings();
+
+        var parameters = new DialogParameters
+        {
+            ["Columns"] = _columns
+        };
+
+        var options = new DialogOptions
+        {
+            CloseButton = true,
+            FullWidth = true,
+            MaxWidth = MaxWidth.Small
+        };
+
+        var dialog = DialogService.Show<ColumnSettingsDialog>("Column Settings", parameters, options);
+
+        var result = await dialog.Result;
+
+        if (!result.Canceled)
+        {
+            // ✅ Save updated values after apply
+           // await SaveColumnSettings();
+            StateHasChanged();
+        }
+    }
+
+    private async Task ApplyLocalStorageColumnSettings()
+    {
+        var enabledKeys = await JS.InvokeAsync<List<string>>("columnStorage.load", StorageKey);
+
+        // First time → no storage → keep all columns checked
+        if (enabledKeys == null)
+            return;
+
+        // If saved list exists → apply
+        foreach (var col in _columns)
+            col.Visible = enabledKeys.Contains(col.Key);
+    }
+    private async Task SaveColumnSettings()
+    {
+        var enabledKeys = _columns
+            .Where(x => x.Visible)
+            .Select(x => x.Key)
+            .ToList();
+
+        await JS.InvokeVoidAsync("columnStorage.save", StorageKey, enabledKeys);
+    }
+
+
+
+    private async Task LoadColumnSettings()
+    {
+        var enabledKeys = await JS.InvokeAsync<List<string>>("columnStorage.load", StorageKey);
+
+        if (enabledKeys == null)
+            return;
+
+        foreach (var col in _columns)
+            col.Visible = enabledKeys.Contains(col.Key);
+    }
+
+
+
 }
