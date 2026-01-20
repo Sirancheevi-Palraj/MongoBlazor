@@ -75,7 +75,8 @@
 
     <!-- DATA GRID -->
     <MudTable T="TransactionData"
-              Items="@_filteredRecords"
+              @ref="_table"
+              ServerData="LoadServerData"
               Dense="true"
               Hover="true"
               Bordered="true"
@@ -84,17 +85,6 @@
               RowsPerPage="20"
               Breakpoint="Breakpoint.Sm">
 
-@*         <HeaderContent>
-            <MudTh>#</MudTh>
-            <MudTh><MudTableSortLabel SortBy="new Func<TransactionData, object>(x => x.TrackingId)">Tracking Id</MudTableSortLabel></MudTh>
-            <MudTh><MudTableSortLabel SortBy="new Func<TransactionData, object>(x => x.Status)">Status</MudTableSortLabel></MudTh>
-            <MudTh>Request XML</MudTh>
-            <MudTh>Response XML</MudTh>
-            <MudTh><MudTableSortLabel InitialDirection="SortDirection.Descending" SortBy="new Func<TransactionData, object>(x => x.RequestDateTime)">Request Time</MudTableSortLabel></MudTh>
-            <MudTh><MudTableSortLabel SortBy="new Func<TransactionData, object>(x => x.ResponseDateTime ?? DateTime.MinValue)">Response Time</MudTableSortLabel></MudTh>
-            <MudTh>Time Taken</MudTh>
-            <MudTh><MudTableSortLabel SortBy="new Func<TransactionData, object>(x => x.Timestamp)">Created</MudTableSortLabel></MudTh>
-        </HeaderContent> *@
         <HeaderContent>
             @if (IsVisible("TrackingId"))
             {
@@ -126,41 +116,12 @@
             }
         </HeaderContent>
 
-      @*   <RowTemplate Context="x">
-            <MudTd>@(_filteredRecords.IndexOf(x) + 1)</MudTd>
-            <MudTd>@x.TrackingId</MudTd>
-
-            <MudTd>
-                <MudChip T="string"
-                         Color="@(x.Status=="SUCCESS" ? Color.Success : Color.Error)"
-                         Variant="Variant.Filled"
-                         Size="Size.Small">
-                    @x.Status
-                </MudChip>
-            </MudTd>
-
-            <MudTd>
-                <MudButton Variant="Variant.Text" Size="Size.Small"
-                           OnClick="@(()=>OpenDialog(x,"Request XML"))">
-                    View
-                </MudButton>
-            </MudTd>
-
-            <MudTd>
-                <MudButton Variant="Variant.Text" Size="Size.Small"
-                           OnClick="@(()=>OpenDialog(x,"Response XML"))">
-                    View
-                </MudButton>
-            </MudTd>
-
-            <MudTd>@x.RequestDateTime.ToString("dd-MMM-yyyy HH:mm:ss")</MudTd>
-            <MudTd>@(x.ResponseDateTime?.ToString("dd-MMM-yyyy HH:mm:ss") ?? "-")</MudTd>
-            <MudTd>@x.TimeTaken.ToString(@"hh\:mm\:ss")</MudTd>
-            <MudTd>@x.Timestamp.ToString("dd-MMM-yyyy HH:mm:ss")</MudTd>
-        </RowTemplate> *@
-
         <RowTemplate Context="x">
-            @if (IsVisible("TrackingId")) { <MudTd>@x.TrackingId</MudTd> }
+            @if (IsVisible("TrackingId"))
+            {
+                <MudTd>@x.TrackingId</MudTd>
+            }
+
             @if (IsVisible("Status"))
             {
                 <MudTd>
@@ -172,18 +133,34 @@
                     </MudChip>
                 </MudTd>
             }
-            @if (IsVisible("RequestDateTime")) { <MudTd>@x.RequestDateTime</MudTd> }
-            @if (IsVisible("ResponseDateTime")) { <MudTd>@x.ResponseDateTime</MudTd> }
-            @if (IsVisible("TimeTaken")) { <MudTd>@x.TimeTaken</MudTd> }
-            @if (IsVisible("Timestamp")) { <MudTd>@x.Timestamp</MudTd> }
-            @if (IsVisible("Message")) { <MudTd>@x.Message</MudTd> }
+
+            @if (IsVisible("RequestDateTime"))
+            {
+                <MudTd>@x.RequestDateTime</MudTd>
+            }
+            @if (IsVisible("ResponseDateTime"))
+            {
+                <MudTd>@x.ResponseDateTime</MudTd>
+            }
+            @if (IsVisible("TimeTaken"))
+            {
+                <MudTd>0</MudTd>
+            }
+            @if (IsVisible("Timestamp"))
+            {
+                <MudTd>@x.Timestamp</MudTd>
+            }
+            @if (IsVisible("Message"))
+            {
+                <MudTd>@x.Message</MudTd>
+            }
         </RowTemplate>
 
         <PagerContent>
             <MudTablePager />
         </PagerContent>
-
     </MudTable>
+
 </MudPaper>
 
 @code {
@@ -197,6 +174,7 @@
     private bool _isLoading = true;
     private string? _startDateTimeLocal;
     private string? _endDateTimeLocal;
+    private MudTable<TransactionData> _table;
 
     private const string StorageKey = "transaction_columns_v1";
     private List<ColumnSetting> _columns = new()
@@ -215,14 +193,14 @@
     {
         await LoadData(); // Load data without localStorage first
     }
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (firstRender)
-        {
-            await LoadColumnSettings();
-            StateHasChanged(); // refresh UI with loaded column settings
-        }
-    }
+    // protected override async Task OnAfterRenderAsync(bool firstRender)
+    // {
+    //     // if (firstRender)
+    //     // {
+    //     //     await LoadColumnSettings();
+    //     //     StateHasChanged(); // refresh UI with loaded column settings
+    //     // }
+    // }
 
     private bool IsVisible(string key)
     {
@@ -245,6 +223,8 @@
         try
         {
             _isLoading = true;
+            
+            
             StateHasChanged();
 
             // Load data from database with filters applied on server
@@ -282,8 +262,56 @@
         // Reload data from server with current filters
         MapDateTimeLocalToDateTime();   // 🔥 IMPORTANT
 
-        await LoadData();
+        await _table.ReloadServerData();
     }
+    private async Task<TableData<TransactionData>> LoadServerData(TableState state, CancellationToken token)
+    {
+        try
+        {
+            _isLoading = true;
+
+            // Map UI datetime-local to DateTime
+            MapDateTimeLocalToDateTime();
+
+            int page = state.Page + 1; // MudTable page starts from 0
+            int pageSize = state.PageSize;
+
+            (var data, var total) = await TransactionService.GetTransactionsAsync(
+                search: string.IsNullOrWhiteSpace(_search) ? null : _search,
+                start: _startDate,
+                end: _endDate,
+                status: _filterStatus,
+                page: page,
+                pageSize: pageSize,
+                sortField: "RequestDateTime",
+                sortDesc: true
+            );
+
+            _totalCount = total;
+
+            return new TableData<TransactionData>()
+            {
+                Items = data,
+                TotalItems = total
+            };
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Error loading data: {ex.Message}", Severity.Error);
+
+            return new TableData<TransactionData>()
+            {
+                Items = new List<TransactionData>(),
+                TotalItems = 0
+            };
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+
 
     private void ApplyClientSideFilter()
     {
@@ -298,7 +326,7 @@
         _endDate = null;
 
         // Reload data without filters
-        await LoadData();
+        await _table.ReloadServerData();
     }
 
     private void OpenDialog(TransactionData item, string title)

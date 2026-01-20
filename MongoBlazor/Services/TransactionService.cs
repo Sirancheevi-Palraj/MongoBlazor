@@ -206,30 +206,32 @@ namespace MongoBlazor.Services
         //}
         public async Task<List<CountResult>> GetResponseTimeBucketsAsync()
         {
-            try
-            {
-                return await _collection.Aggregate()
-                    .Project(x => new
-                    {
-                        Seconds = x.TimeTaken.TotalSeconds
-                    })
-                    .Group(x =>
-                        x.Seconds < 1 ? "<1s" :
-                        x.Seconds < 2 ? "1-2s" :
-                        x.Seconds < 3 ? "2-3s" :
-                        ">3s",
-                        g => new CountResult
-                        {
-                            Label = g.Key,
-                            Count = g.Count()
-                        })
-                    .ToListAsync();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[GetResponseTimeBucketsAsync] {ex}");
-                return new();
-            }
+            return new();
+
+            //try
+            //{
+            //    return await _collection.Aggregate()
+            //        .Project(x => new
+            //        {
+            //            Seconds = x.TimeTaken.TotalSeconds
+            //        })
+            //        .Group(x =>
+            //            x.Seconds < 1 ? "<1s" :
+            //            x.Seconds < 2 ? "1-2s" :
+            //            x.Seconds < 3 ? "2-3s" :
+            //            ">3s",
+            //            g => new CountResult
+            //            {
+            //                Label = g.Key,
+            //                Count = g.Count()
+            //            })
+            //        .ToListAsync();
+            //}
+            //catch (Exception ex)
+            //{
+            //    Console.WriteLine($"[GetResponseTimeBucketsAsync] {ex}");
+            //    return new();
+            //}
         }
         public async Task<List<TwoValueResult>> GetSuccessRateByHourAsync()
         {

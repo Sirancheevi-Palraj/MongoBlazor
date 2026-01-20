@@ -155,38 +155,40 @@
             </MudItem>
 
 
-           
 
             <MudItem xs="12" md="12">
-    <MudCard>
-        <MudCardHeader>
-            <b>Status Distribution Trend</b>
+                <MudCard Style="width:100%;">
 
-                        <MudSelect T="string"
-                                   Label="Period"
-                                   Value="@periodMode"
-                                   ValueChanged="@OnPeriodChanged"
-                                   Dense="true"
-                                   AnchorOrigin="Origin.BottomCenter">
+                    <MudCardHeader Class="py-2">
+                        <MudStack Row="true" AlignItems="AlignItems.Center" Style="width:100%;">
+                            <MudText Typo="Typo.subtitle1"><b>Status Distribution Trend</b></MudText>
 
-                            <MudSelectItem Value="@("Daily")">Daily</MudSelectItem>
-                            <MudSelectItem Value="@("Weekly")">Weekly</MudSelectItem>
-                            <MudSelectItem Value="@("Monthly")">Monthly</MudSelectItem>
+                            <MudSpacer />
 
-                        </MudSelect>
+                            <MudSelect T="string"
+                                       Dense="true"
+                                       Value="@periodMode"
+                                       ValueChanged="@OnPeriodChanged"
+                                       Style="min-width:140px;">
+                                <MudSelectItem Value="@("Daily")">Daily</MudSelectItem>
+                                <MudSelectItem Value="@("Weekly")">Weekly</MudSelectItem>
+                                <MudSelectItem Value="@("Monthly")">Monthly</MudSelectItem>
+                            </MudSelect>
+                        </MudStack>
+                    </MudCardHeader>
 
+                    <MudCardContent Class="pa-0" Style="width:100%;">
+                        <div style="width:100%; height:380px;">
+                            <MudChart ChartType="ChartType.Bar"
+                                      ChartSeries="@statusTrendSeries"
+                                      XAxisLabels="@statusTrendLabels"
+                                      Height="380px" />
+                        </div>
+                    </MudCardContent>
 
+                </MudCard>
+            </MudItem>
 
-        </MudCardHeader>
-
-        <MudCardContent>
-            <MudChart ChartType="ChartType.Bar"
-                      ChartSeries="@statusTrendSeries"
-                      XAxisLabels="@statusTrendLabels"
-                      Height="320px" />
-        </MudCardContent>
-    </MudCard>
-</MudItem>
 
 
         </MudGrid>
